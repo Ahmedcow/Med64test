@@ -1,0 +1,9 @@
+{
+  "name": "med64-exam-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Med64 medical examination platform with a server-side Gemini AI proxy on Vercel.",
+  "engines": {
+    "node": ">=18"
+  }
+}
