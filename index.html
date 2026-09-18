@@ -599,12 +599,25 @@ async function fetchJSON(url){
 async function loadQuestionsFromSupabase(){
   if(!SUPABASE_ENABLED)return false;
   try{
-    const {data,error}=await supabaseClient
-      .from('questions')
-      .select('id,module,subject,lecture,question,options,correct_index,explanation,difficulty,reference');
-    if(error)throw error;
-    if(!Array.isArray(data))throw new Error('Invalid questions response.');
-    const all=data.map(q=>normalizeQuestion({
+    // Supabase/PostgREST commonly caps a single response at 1,000 rows.
+    // Load the question bank in pages so MedEx can use 1,000+ questions.
+    const PAGE_SIZE=1000;
+    const allRows=[];
+    let from=0;
+    while(true){
+      const to=from+PAGE_SIZE-1;
+      const {data,error}=await supabaseClient
+        .from('questions')
+        .select('id,module,subject,lecture,question,options,correct_index,explanation,difficulty,reference')
+        .order('id',{ascending:true})
+        .range(from,to);
+      if(error)throw error;
+      if(!Array.isArray(data))throw new Error('Invalid questions response.');
+      allRows.push(...data);
+      if(data.length<PAGE_SIZE)break;
+      from+=PAGE_SIZE;
+    }
+    const all=allRows.map(q=>normalizeQuestion({
       id:q.id,module:q.module,subject:q.subject,lecture:q.lecture,question:q.question,
       options:q.options,correctIndex:q.correct_index,explanation:q.explanation,
       difficulty:q.difficulty,reference:q.reference,source:'Supabase'
