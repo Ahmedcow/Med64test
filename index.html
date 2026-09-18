@@ -600,11 +600,21 @@ async function fetchJSON(url){
 async function loadQuestionsFromSupabase(){
   if(!SUPABASE_ENABLED)return false;
   try{
-    const {data,error}=await supabaseClient
-      .from('questions')
-      .select('id,module,subject,lecture,question,options,correct_index,explanation,difficulty,reference');
-    if(error)throw error;
-    if(!Array.isArray(data))throw new Error('Invalid questions response.');
+    const PAGE_SIZE=1000;
+    const allRows=[];
+    for(let from=0;;from+=PAGE_SIZE){
+      const to=from+PAGE_SIZE-1;
+      const {data,error}=await supabaseClient
+        .from('questions')
+        .select('id,module,subject,lecture,question,options,correct_index,explanation,difficulty,reference')
+        .order('id',{ascending:true})
+        .range(from,to);
+      if(error)throw error;
+      if(!Array.isArray(data))throw new Error('Invalid questions response.');
+      allRows.push(...data);
+      if(data.length<PAGE_SIZE)break;
+    }
+    const data=allRows;
     const all=data.map(q=>normalizeQuestion({
       id:q.id,module:q.module,subject:q.subject,lecture:q.lecture,question:q.question,
       options:q.options,correctIndex:q.correct_index,explanation:q.explanation,
@@ -1225,11 +1235,24 @@ function renderBank(){
   document.getElementById('app').innerHTML=layout('Question Bank','Questions are loaded from Supabase when connected, with GitHub as a fallback.',body);
   filterBank();
 }
-function filterBank(){
+let bankPage=0;
+const BANK_PAGE_SIZE=500;
+function filterBank(resetPage=true){
   const s=(document.getElementById('bankSearch')?.value||'').toLowerCase(),mod=document.getElementById('bankModule')?.value||'',subj=document.getElementById('bankSubject')?.value||'',lect=document.getElementById('bankLecture')?.value||'',src=document.getElementById('bankSource')?.value||'';
+  if(resetPage) bankPage=0;
   const list=bank.filter(q=>(!s||[q.id,q.question,q.subject,q.module,q.lecture].join(' ').toLowerCase().includes(s))&&(!mod||q.module===mod)&&(!subj||q.subject===subj)&&(!lect||q.lecture===lect)&&(!src||q.source===src));
   const rows=document.getElementById('bankRows');if(!rows)return;
-  rows.innerHTML=list.slice(0,500).map(q=>`<tr><td><b>${esc(q.id)}</b></td><td>${esc(q.module)}</td><td>${esc(q.subject)}</td><td>${esc(q.lecture)}</td><td>${esc(q.question)}</td><td>${progressFor([q])}% · ${accuracyFor([q])}% acc.</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No matching questions.</td></tr>';
+  const totalPages=Math.max(1,Math.ceil(list.length/BANK_PAGE_SIZE));
+  if(bankPage>=totalPages) bankPage=totalPages-1;
+  const start=bankPage*BANK_PAGE_SIZE;
+  const pageRows=list.slice(start,start+BANK_PAGE_SIZE);
+  rows.innerHTML=pageRows.map(q=>`<tr><td><b>${esc(q.id)}</b></td><td>${esc(q.module)}</td><td>${esc(q.subject)}</td><td>${esc(q.lecture)}</td><td>${esc(q.question)}</td><td>${progressFor([q])}% · ${accuracyFor([q])}% acc.</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No matching questions.</td></tr>';
+  const table=rows.closest('.table-wrap');
+  if(table){
+    let pager=document.getElementById('bankPager');
+    if(!pager){ pager=document.createElement('div'); pager.id='bankPager'; pager.className='actions'; table.parentElement.appendChild(pager); }
+    pager.innerHTML=`<span class="mini">Showing ${list.length?start+1:0}–${Math.min(start+BANK_PAGE_SIZE,list.length)} of ${list.length} matching questions</span><button class="btn" ${bankPage<=0?'disabled':''} onclick="bankPage--;filterBank(false)">Previous</button><span class="mini">Page ${bankPage+1} / ${totalPages}</span><button class="btn" ${bankPage>=totalPages-1?'disabled':''} onclick="bankPage++;filterBank(false)">Next</button>`;
+  }
 }
 
 function renderImport(){
@@ -1620,7 +1643,7 @@ function exportHistory(){downloadBlob(JSON.stringify({exportedAt:new Date().toIS
    AI Assistant (multi-provider)
    - Groq direct
    - Gemini direct
-   - Vercel AI Gateway (OpenAI / Anthropic / Google and more)
+   - OpenRouter (third provider / multi-model gateway)
    - API credentials stay server-side in Vercel environment variables
    ============================================================ */
 
@@ -1629,25 +1652,26 @@ let aiTab='generate';
 const AI_PROVIDER_MODELS={
   groq:[
     {id:'openai/gpt-oss-120b',label:'GPT-OSS 120B — high reasoning'},
-    {id:'qwen/qwen3.8-27b',label:'Qwen 3.8 27B — structured output'}
+    {id:'qwen/qwen3-32b',label:'Qwen 3 32B — structured / high volume'}
   ],
   gemini:[
-    {id:'gemini-2.5-pro',label:'Gemini 2.5 Pro — deep reasoning / science'},
-    {id:'gemini-2.5-flash',label:'Gemini 2.5 Flash — fast high-volume'},
-    {id:'gemini-2.5-flash-lite',label:'Gemini 2.5 Flash-Lite — low cost / high volume'}
+    {id:'gemini-3.1-pro-preview',label:'Gemini 3.1 Pro Preview — advanced reasoning'},
+    {id:'gemini-3-flash-preview',label:'Gemini 3 Flash Preview — fast high-volume'},
+    {id:'gemini-3.1-flash-lite',label:'Gemini 3.1 Flash-Lite — high-volume / lower cost'}
   ],
-  vercel:[
-    {id:'openai/gpt-5.4',label:'GPT-5.4 — advanced reasoning'},
-    {id:'anthropic/claude-opus-4.5',label:'Claude Opus 4.5 — difficult reasoning'},
-    {id:'google/gemini-2.5-pro',label:'Gemini 2.5 Pro — science / reasoning'},
-    {id:'openai/gpt-5.5',label:'GPT-5.5 — latest Vercel catalog option'}
+  openrouter:[
+    {id:'google/gemini-3.1-pro-preview',label:'Gemini 3.1 Pro Preview'},
+    {id:'deepseek/deepseek-v3.2',label:'DeepSeek V3.2 — reasoning / value'},
+    {id:'qwen/qwen3.5-9b',label:'Qwen 3.5 9B — fast / low cost'},
+    {id:'mistralai/mistral-large-2512',label:'Mistral Large 3 — structured / reasoning'}
   ]
 };
 
 function aiProviderLabel(provider){
-  return provider==='gemini'?'Google Gemini':provider==='vercel'?'Vercel AI Gateway':'Groq';
+  return provider==='gemini'?'Google Gemini':provider==='openrouter'?'OpenRouter':'Groq';
 }
 function ensureAIModelForProvider(){
+  if(aiSettings.provider==='vercel') aiSettings.provider='openrouter';
   const provider=aiSettings.provider||'groq';
   const models=AI_PROVIDER_MODELS[provider]||AI_PROVIDER_MODELS.groq;
   if(!models.some(m=>m.id===aiSettings.model)) aiSettings.model=models[0].id;
@@ -1693,7 +1717,7 @@ function renderAIAssistant(){
       <div class="field"><label>AI provider</label><select id="aiProvider" onchange="changeAIProvider()">
         <option value="groq" ${provider==='groq'?'selected':''}>Groq</option>
         <option value="gemini" ${provider==='gemini'?'selected':''}>Google Gemini</option>
-        <option value="vercel" ${provider==='vercel'?'selected':''}>Vercel AI Gateway</option>
+        <option value="openrouter" ${provider==='openrouter'?'selected':''}>OpenRouter</option>
       </select></div>
       <div class="field"><label>AI model</label><select id="aiModel">${models.map(m=>`<option value="${attrJs(m.id)}" ${m.id===aiSettings.model?'selected':''}>${esc(m.label)}</option>`).join('')}</select></div>
     </div>
