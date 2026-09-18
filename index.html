@@ -282,7 +282,7 @@ const DEFAULT_SETTINGS = {
 };
 
 const DEFAULT_AI_SETTINGS = {
-  model: '',
+  model: 'openai/gpt-oss-120b',
   accessCode: ''
 };
 
@@ -1616,23 +1616,23 @@ function exportBank(){ if(!isAdmin){toast('Admin access required.','error');retu
 function exportHistory(){downloadBlob(JSON.stringify({exportedAt:new Date().toISOString(),history:loadJSON(CONFIG.historyKey,[])},null,2),'med64-exam-history.json','application/json');}
 
 /* ============================================================
-   AI Assistant (Gemini)
+   AI Assistant (Groq)
    - Generates new questions in the site's question format
    - Lets the user chat with the model about anything
    - Generated questions are kept separate until added to the bank
    - The API key lives only in this browser and calls Google's
-     Generative Language API through a server-side proxy (/api/gemini),
+     Groq API through a server-side Vercel proxy (/api/groq),
      so visitors never need to bring their own API key.
    ============================================================ */
 
 let aiTab='generate';
 
-async function callGemini(contents, generationConfig){
+async function callGroq(contents, generationConfig){
   let res, data;
   const headers={'Content-Type':'application/json'};
   if(aiSettings.accessCode) headers['x-access-code']=aiSettings.accessCode;
   try{
-    res=await fetch('/api/gemini',{
+    res=await fetch('/api/groq',{
       method:'POST',
       headers,
       body:JSON.stringify({contents, generationConfig, model: aiSettings.model || undefined})
@@ -1645,19 +1645,19 @@ async function callGemini(contents, generationConfig){
     throw new Error((data && data.error) || `HTTP ${res.status} from the AI service.`);
   }
   const text=data && data.text;
-  if(!text) throw new Error('The model returned an empty response.');
+  if(!text) throw new Error('Groq returned an empty response.');
   return text;
 }
 
 function renderAIAssistant(){
   const body=`
   <div class="card">
-    <div class="category-head"><strong>Gemini AI</strong><span class="ai-badge">✦ Gemini 3.6</span></div>
-    <p class="mini" style="margin:8px 0 0">Questions and chat are powered by this site's own server (a Vercel serverless function). Nobody needs to bring a personal API key — the key lives only on the server and is never sent to or stored in your browser.</p>
+    <div class="category-head"><strong>Groq AI</strong><span class="ai-badge">✦ GPT-OSS 120B</span></div>
+    <p class="mini" style="margin:8px 0 0">Questions and chat are powered by this site's own server (a Vercel serverless function). Nobody needs to bring a personal API key — the Groq API key lives only on the Vercel server and is never exposed to the browser.</p>
     <details style="margin-top:10px">
       <summary class="mini" style="cursor:pointer;color:var(--primary2);font-weight:700">Advanced settings</summary>
       <div class="grid two" style="margin-top:10px">
-        <div class="field"><label>Model override (optional)</label><input id="aiModel" placeholder="Uses the server default" value="${esc(aiSettings.model)}"></div>
+        <div class="field"><label>Groq model override (optional)</label><input id="aiModel" placeholder="openai/gpt-oss-120b" value="${esc(aiSettings.model)}"></div>
         <div class="field"><label>Access code (only if this site requires one)</label><input id="aiAccessCode" type="password" placeholder="Leave blank if none" value="${esc(aiSettings.accessCode)}"></div>
       </div>
       <div class="actions" style="margin-top:10px"><button class="btn" onclick="saveAISettings()">Save</button></div>
@@ -1670,7 +1670,7 @@ function renderAIAssistant(){
   </div>
 
   ${aiTab==='generate'?aiGenerateTabHTML():aiChatTabHTML()}`;
-  document.getElementById('app').innerHTML=layout('AI Assistant','Generate practice questions or ask Gemini anything.',body);
+  document.getElementById('app').innerHTML=layout('AI Assistant','Generate practice questions or ask Groq anything.',body);
   if(aiTab==='chat') scrollChatToBottom();
 }
 function setAITab(tab){ aiTab=tab; renderAIAssistant(); }
@@ -1678,8 +1678,8 @@ function setAITab(tab){ aiTab=tab; renderAIAssistant(); }
 function aiGenerateTabHTML(){
   const modules=getModules();
   return `<div class="card">
-    <h3 style="margin-top:0">Generate questions with Gemini 3.6 Flash</h3>
-    <p class="mini" style="margin:6px 0 14px">Choose from the modules, subjects and lectures that already exist in your website question bank. Then choose whether Gemini should use its medical knowledge or your website questions as the source.</p>
+    <h3 style="margin-top:0">Generate questions with Groq GPT-OSS 120B</h3>
+    <p class="mini" style="margin:6px 0 14px">Choose from the modules, subjects and lectures that already exist in your website question bank. Then choose whether Groq should use its medical knowledge or your website questions as the source.</p>
     <div class="grid three">
       <div class="field"><label>Module</label><select id="genModule" onchange="updateAIGeneratorSubjects()"><option value="">Select module</option>${modules.map(m=>`<option value="${attrJs(m)}">${esc(m)}</option>`).join('')}</select></div>
       <div class="field"><label>Subject</label><select id="genSubject" onchange="updateAIGeneratorLectures()" disabled><option value="">Select subject</option></select></div>
@@ -1698,7 +1698,7 @@ function aiGenerateTabHTML(){
       </select></div>
       <div class="field"><label>Number of questions</label><input id="genCount" type="number" min="1" max="30" value="5"></div>
       <div class="field"><label>Question source</label><select id="genSourceType" onchange="updateAIGeneratorSourceUI()">
-        <option value="knowledge">Gemini medical knowledge</option>
+        <option value="knowledge">Groq medical knowledge</option>
         <option value="website">Questions in this website</option>
       </select></div>
     </div>
@@ -1750,17 +1750,17 @@ function updateAIGeneratorSourceUI(){
   if(type==='website') {
     box.className='notice '+(pool.length?'ok':'error');
     box.textContent=pool.length
-      ? `Gemini will use ${pool.length} existing website question${pool.length===1?'':'s'} from this exact lecture as source material and create new, non-copying questions.`
-      : 'No website questions exist for this exact module, subject and lecture. Choose Gemini medical knowledge or select another lecture.';
+      ? `Groq will use ${pool.length} existing website question${pool.length===1?'':'s'} from this exact lecture as source material and create new, non-copying questions.`
+      : 'No website questions exist for this exact module, subject and lecture. Choose Groq medical knowledge or select another lecture.';
   } else {
     box.className='notice';
-    box.textContent='Gemini will create original higher-order questions using its medical knowledge for the selected module, subject and lecture.';
+    box.textContent='Groq will create original higher-order questions using its medical knowledge for the selected module, subject and lecture.';
   }
 }
 
 function aiChatTabHTML(){
   return `<div class="card">
-    <div class="category-head"><strong>Ask Gemini anything</strong>${aiChat.length?'<button class="btn" onclick="clearAIChat()">Clear chat</button>':''}</div>
+    <div class="category-head"><strong>Ask Groq anything</strong>${aiChat.length?'<button class="btn" onclick="clearAIChat()">Clear chat</button>':''}</div>
     <div class="chat-log" id="chatLog" style="margin-top:12px">${aiChat.length?aiChat.map(m=>`<div class="chat-msg ${m.role==='ai'?'ai':m.role==='error'?'error':'user'}">${esc(m.text)}</div>`).join(''):'<div class="empty">Ask a medical or exam-prep question to get started.</div>'}</div>
     <div class="chat-input-row">
       <textarea id="chatInput" placeholder="Ask anything…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAIChat();}"></textarea>
@@ -1836,16 +1836,16 @@ async function generateAIQuestions(){
   const sourcePool=getAIGeneratorPool();
 
   if(!module||!subject||!lecture){toast('Select a module, subject and lecture from the website lists.','error');return;}
-  if(sourceType==='website'&&!sourcePool.length){toast('No website questions exist for this exact lecture. Choose another lecture or use Gemini medical knowledge.','error');return;}
+  if(sourceType==='website'&&!sourcePool.length){toast('No website questions exist for this exact lecture. Choose another lecture or use Groq medical knowledge.','error');return;}
 
   const btn=document.getElementById('genBtn');
   const resultBox=document.getElementById('genResult');
   aiBusy=true;
   if(btn){btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Generating…';}
-  if(resultBox) resultBox.innerHTML='<div class="card" style="margin-top:14px"><div class="mini">Contacting Gemini 3.6 Flash…</div></div>';
+  if(resultBox) resultBox.innerHTML='<div class="card" style="margin-top:14px"><div class="mini">Contacting Groq GPT-OSS 120B…</div></div>';
 
   let sourceBlock='';
-  let reference='Gemini 3.6 Flash medical knowledge';
+  let reference='Groq GPT-OSS 120B medical knowledge';
   if(sourceType==='website'){
     // Keep the source compact enough for high-volume generation while preserving
     // the actual wording, options, correct answer and explanation from the site.
@@ -1868,7 +1868,7 @@ Subject: ${subject}
 Lecture: ${lecture}
 Difficulty: ${difficulty}
 Thinking level: ${thinkingLevel}
-Question source: ${sourceType==='website'?'questions already in this website':'Gemini medical knowledge'}
+Question source: ${sourceType==='website'?'questions already in this website':'Groq medical knowledge'}
 
 ${sourceBlock}
 
@@ -1887,7 +1887,7 @@ Rules:
 - explanation should briefly justify the correct answer.`;
 
   try{
-    const text=await callGemini([{role:'user',parts:[{text:prompt}]}],{maxOutputTokens:Math.min(12000,Math.max(2500,count*500))});
+    const text=await callGroq([{role:'user',parts:[{text:prompt}]}],{maxOutputTokens:Math.min(12000,Math.max(2500,count*500))});
     const rawList=parseAIQuestionJSON(text);
     if(!rawList.length) throw new Error('No questions were returned. Try again or adjust your selections.');
 
@@ -1903,20 +1903,20 @@ Rules:
     },'AI generated'));
 
     const errors=stamped.map((q,i)=>validateQuestion(q,i)).filter(Boolean);
-    if(errors.length) throw new Error('Gemini returned a malformed question: '+errors[0]);
-    if(stamped.length<count) throw new Error(`Gemini returned ${stamped.length} questions instead of ${count}. Please try again.`);
+    if(errors.length) throw new Error('Groq returned a malformed question: '+errors[0]);
+    if(stamped.length<count) throw new Error(`Groq returned ${stamped.length} questions instead of ${count}. Please try again.`);
 
     aiQuestions.push(...stamped);
     localStorage.setItem(CONFIG.aiQuestionsKey,JSON.stringify(aiQuestions));
 
-    if(resultBox) resultBox.innerHTML=`<div class="card" style="margin-top:14px"><div class="notice ok">Generated ${stamped.length} question${stamped.length===1?'':'s'} from ${sourceType==='website'?'your website question bank':'Gemini medical knowledge'}.</div>
+    if(resultBox) resultBox.innerHTML=`<div class="card" style="margin-top:14px"><div class="notice ok">Generated ${stamped.length} question${stamped.length===1?'':'s'} from ${sourceType==='website'?'your website question bank':'Groq medical knowledge'}.</div>
     <div class="mini" style="margin-top:8px">${esc(module+' AI generated')} · ${esc(subject)} · ${esc(lecture)}</div>
     <div style="margin-top:12px">${stamped.map(q=>aiQuestionPreviewCard(q)).join('')}</div>
     <div class="actions" style="margin-top:12px"><button class="btn primary" onclick="go('aiquestions')">Review in AI Questions</button></div></div>`;
-    toast(`Generated ${stamped.length} questions with Gemini 3.6 Flash.`,'ok');
+    toast(`Generated ${stamped.length} questions with Groq GPT-OSS 120B.`,'ok');
   }catch(e){
     if(resultBox) resultBox.innerHTML=`<div class="card" style="margin-top:14px"><div class="notice error">Generation failed: ${esc(e.message)}</div></div>`;
-    toast('Gemini generation failed: '+e.message,'error');
+    toast('Groq generation failed: '+e.message,'error');
   }finally{
     aiBusy=false;
     if(btn){btn.disabled=false; btn.textContent='Generate questions';}
@@ -1946,7 +1946,7 @@ async function sendAIChat(){
         ? `Answer the user's message in ordinary, readable text. Do NOT return JSON, JSON arrays, code blocks, or a machine-readable object. Use normal sentences, short paragraphs, and bullet points when useful. If the user asks for an explanation, explain it clearly rather than formatting it as JSON.\n\nUser message:\n${m.text}`
         : m.text}]
     }));
-    const reply=await callGemini(contents,{maxOutputTokens:4096,responseMimeType:'text/plain'});
+    const reply=await callGroq(contents,{maxOutputTokens:4096,responseMimeType:'text/plain'});
     aiChat.push({role:'ai',text:formatAIChatReply(reply)});
   }catch(e){
     aiChat.push({role:'error',text:'Error: '+e.message});
@@ -1979,7 +1979,7 @@ function renderAIQuestions(){
     <button class="btn danger" onclick="clearAllAIQuestions()">Delete all</button>
   </div>`:''}</div>
   <div style="margin-top:16px">${aiQuestions.length?aiQuestions.slice().reverse().map(q=>renderAIQuestionRow(q)).join(''):'<div class="card empty">No AI questions yet. Generate some from the AI Assistant page.</div>'}</div>`;
-  document.getElementById('app').innerHTML=layout('AI Questions','Every question Gemini has generated for you, independent of the main bank.',body,`<button class="btn primary" onclick="go('ai')">+ Generate more</button>`);
+  document.getElementById('app').innerHTML=layout('AI Questions','Every question Groq has generated for you, independent of the main bank.',body,`<button class="btn primary" onclick="go('ai')">+ Generate more</button>`);
 }
 function renderAIQuestionRow(q){
   const diffClass=(q.difficulty||'').toLowerCase();
