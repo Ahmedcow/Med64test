@@ -29,19 +29,19 @@ export default async function handler(req, res) {
         generationConfig,
         providerName: 'Groq'
       });
-    } else if (provider === 'vercel') {
+    } else if (provider === 'openrouter') {
       result = await callOpenAICompatible({
-        apiKey: process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN,
-        url: 'https://ai-gateway.vercel.sh/v1/chat/completions',
-        model: model || 'openai/gpt-5.4',
+        apiKey: process.env.OPENROUTER_API_KEY,
+        url: 'https://openrouter.ai/api/v1/chat/completions',
+        model: model || 'google/gemini-3.1-pro-preview',
         messages,
         generationConfig,
-        providerName: 'Vercel AI Gateway'
+        providerName: 'OpenRouter'
       });
     } else if (provider === 'gemini') {
       result = await callGemini({
         apiKey: process.env.GEMINI_API_KEY,
-        model: model || 'gemini-2.5-pro',
+        model: model || 'gemini-3.1-pro-preview',
         messages,
         generationConfig
       });
@@ -107,7 +107,7 @@ async function callGemini({ apiKey, model, messages, generationConfig }) {
   const payload = {
     contents,
     generationConfig: {
-      temperature: 0.35,
+      temperature: 1.0,
       maxOutputTokens: Number(generationConfig.maxOutputTokens) > 0
         ? Math.min(Number(generationConfig.maxOutputTokens), 65536)
         : 4096
