@@ -41,7 +41,7 @@ export default async function handler(req, res) {
     } else if (provider === 'gemini') {
       result = await callGemini({
         apiKey: process.env.GEMINI_API_KEY,
-        model: model || 'gemini-3.1-pro-preview',
+        model: model || 'gemini-3.6-flash',
         messages,
         generationConfig
       });
@@ -107,7 +107,6 @@ async function callGemini({ apiKey, model, messages, generationConfig }) {
   const payload = {
     contents,
     generationConfig: {
-      temperature: 1.0,
       maxOutputTokens: Number(generationConfig.maxOutputTokens) > 0
         ? Math.min(Number(generationConfig.maxOutputTokens), 65536)
         : 4096
