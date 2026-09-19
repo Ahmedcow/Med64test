@@ -1658,10 +1658,9 @@ const AI_PROVIDER_MODELS={
     {id:'gemini-3.6-flash',label:'Gemini 3.6 Flash — recommended for MCQ generation'}
   ],
   openrouter:[
-    {id:'openrouter/free',label:'OpenRouter Free Router — structured JSON (recommended)'},
-    {id:'google/gemma-4-31b-it:free',label:'Gemma 4 31B — free + JSON'},
-    {id:'inclusionai/ling-3.0-flash-sante:free',label:'Ling 3.0 Flash Sante — medical (JSON fallback)'},
-    {id:'nvidia/nemotron-3-ultra-550b-a55b:free',label:'NVIDIA Nemotron 3 Ultra — JSON fallback'}
+    {id:'google/gemma-4-31b-it:free',label:'Gemma 4 31B — free JSON (recommended)'},
+    {id:'google/gemma-4-26b-a4b-it:free',label:'Gemma 4 26B A4B — free JSON'},
+    {id:'openrouter/free',label:'OpenRouter Free Router — structured JSON'}
   ]
 };
 
@@ -1993,13 +1992,14 @@ Rules:
 - Make distractors plausible and based on common misconceptions or clinically relevant alternatives.
 - Avoid duplicate questions and avoid copying source wording.
 - Keep the questions focused on the selected lecture.
-- Return ONLY a valid JSON array. No markdown fences, no commentary, and no text before or after the array.
+- Return ONLY a valid JSON object. No markdown fences, no commentary, and no text before or after the object.
+- The object must have exactly this top-level shape: {\"questions\":[...]}
 - Each item must have exactly this shape:
 {"question":"...","options":["A","B","C","D"],"correctIndex":0,"explanation":"Brief justification.","difficulty":"${difficulty}"}
 - correctIndex is zero-based.
 - Keep each question concise and each explanation to 1–2 sentences.
-- For this batch, return exactly ${batchCount} complete objects.
-- Do not stop in the middle of an object. Return the complete JSON array.`;
+- For this batch, return exactly ${batchCount} complete objects inside the questions array.
+- Do not stop in the middle of an object. Return the complete JSON object.`;
 
       const text=await callAI([{role:'user',parts:[{text:prompt}]}],{
         maxOutputTokens: aiSettings.provider==='openrouter'
