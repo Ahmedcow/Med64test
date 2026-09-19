@@ -64,15 +64,69 @@ async function callOpenAICompatible({ apiKey, url, model, messages, generationCo
 
   const requestedTokens = Number(generationConfig.maxOutputTokens);
   const maxTokens = Number.isFinite(requestedTokens) && requestedTokens > 0
-    ? Math.min(requestedTokens, providerName === 'OpenRouter' ? 1800 : 65536)
-    : (providerName === 'OpenRouter' ? 1800 : 4096);
+    ? Math.min(requestedTokens, providerName === 'OpenRouter' ? 2200 : 65536)
+    : (providerName === 'OpenRouter' ? 2200 : 4096);
+
+  // MCQ generation requires machine-valid JSON. OpenRouter's Free Router
+  // can automatically select free models that support structured outputs.
+  // If a user selected a free model without structured-output support, route
+  // this generation request through the Free Router instead of returning
+  // malformed JSON to the browser. Normal AI chat is unaffected.
+  let effectiveModel = model;
+  const wantsJson = providerName === 'OpenRouter' && generationConfig.jsonMode === true;
+  const structuredModels = new Set([
+    'openrouter/free',
+    'google/gemma-4-31b-it:free'
+  ]);
+  if (wantsJson && !structuredModels.has(effectiveModel)) {
+    effectiveModel = 'openrouter/free';
+  }
 
   const payload = {
-    model,
+    model: effectiveModel,
     messages,
     temperature: 0.2,
     max_tokens: maxTokens
   };
+
+  if (wantsJson) {
+    payload.response_format = {
+      type: 'json_schema',
+      json_schema: {
+        name: 'medical_question_batch',
+        strict: true,
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            questions: {
+              type: 'array',
+              minItems: 1,
+              maxItems: 1,
+              items: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                  question: { type: 'string' },
+                  options: {
+                    type: 'array',
+                    minItems: 4,
+                    maxItems: 4,
+                    items: { type: 'string' }
+                  },
+                  correctIndex: { type: 'integer', minimum: 0, maximum: 3 },
+                  explanation: { type: 'string' },
+                  difficulty: { type: 'string' }
+                },
+                required: ['question','options','correctIndex','explanation','difficulty']
+              }
+            }
+          },
+          required: ['questions']
+        }
+      }
+    };
+  }
 
   const response = await fetch(url, {
     method: 'POST',
@@ -101,7 +155,7 @@ async function callOpenAICompatible({ apiKey, url, model, messages, generationCo
 
   const text = data?.choices?.[0]?.message?.content;
   if (!text) throw new Error(`${providerName} returned no text content.`);
-  return { text, model: data?.model || model, provider: providerName };
+  return { text, model: data?.model || effectiveModel, provider: providerName };
 }
 
 async function callGemini({ apiKey, model, messages, generationConfig }) {
