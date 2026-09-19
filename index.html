@@ -1882,27 +1882,43 @@ function formatAIChatReply(reply){
 
 function parseAIQuestionJSON(text){
   let cleaned=String(text||'').trim();
-  // Models sometimes wrap JSON in markdown fences or add a short sentence before/after it.
   cleaned=cleaned.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();
-  const start=cleaned.indexOf('[');
-  const end=cleaned.lastIndexOf(']');
-  if(start!==-1 && end>start) cleaned=cleaned.slice(start,end+1).trim();
 
+  // First try the response exactly as returned.
   try{
     const parsed=JSON.parse(cleaned);
-    if(!Array.isArray(parsed)) throw new Error('AI response was not a JSON array.');
-    return parsed;
-  }catch(firstError){
-    // Common harmless formatting issue: trailing commas before ] or }.
-    const repaired=cleaned.replace(/,\s*([}\]])/g,'$1');
+    if(Array.isArray(parsed)) return parsed;
+    if(parsed && Array.isArray(parsed.questions)) return parsed.questions;
+  }catch(_){}
+
+  // Extract the largest complete JSON array from surrounding prose/code fences.
+  const start=cleaned.indexOf('[');
+  const end=cleaned.lastIndexOf(']');
+  if(start!==-1 && end>start){
+    const candidate=cleaned.slice(start,end+1).trim();
     try{
-      const parsed=JSON.parse(repaired);
-      if(!Array.isArray(parsed)) throw new Error('AI response was not a JSON array.');
-      return parsed;
-    }catch(secondError){
-      throw new Error('The AI returned incomplete or invalid JSON. Try a smaller batch (for example 10–20 questions).');
+      const parsed=JSON.parse(candidate);
+      if(Array.isArray(parsed)) return parsed;
+    }catch(_){
+      const repaired=candidate.replace(/,\s*([}\]])/g,'$1');
+      try{
+        const parsed=JSON.parse(repaired);
+        if(Array.isArray(parsed)) return parsed;
+      }catch(_){}
     }
   }
+
+  // Some models return a single object for a one-question batch.
+  const objStart=cleaned.indexOf('{');
+  const objEnd=cleaned.lastIndexOf('}');
+  if(objStart!==-1 && objEnd>objStart){
+    try{
+      const parsed=JSON.parse(cleaned.slice(objStart,objEnd+1));
+      if(parsed && parsed.question && Array.isArray(parsed.options)) return [parsed];
+    }catch(_){}
+  }
+
+  throw new Error('The AI returned incomplete JSON. OpenRouter free models do not enforce JSON output; MedEx now sends one question per request to prevent truncation. Please retry.');
 }
 function aiQuestionPreviewCard(q){
   const diffClass=(q.difficulty||'').toLowerCase();
@@ -1948,7 +1964,7 @@ ${JSON.stringify(sourceQuestions)}`;
   // Generate in small batches. OpenRouter free/low-credit keys can reject a request
   // before generation if max output tokens exceed the remaining credit allowance.
   // Keep OpenRouter batches smaller and the requested output budget conservative.
-  const batchSize=aiSettings.provider==='openrouter' ? Math.min(3,count) : Math.min(10,count);
+  const batchSize=aiSettings.provider==='openrouter' ? 1 : Math.min(10,count);
   const batches=[];
   for(let n=0;n<count;n+=batchSize) batches.push(Math.min(batchSize,count-n));
   const allRaw=[];
@@ -1979,13 +1995,15 @@ Rules:
 - Keep the questions focused on the selected lecture.
 - Return ONLY a valid JSON array. No markdown fences, no commentary, and no text before or after the array.
 - Each item must have exactly this shape:
-{"question":"...","options":["...","...","...","..."],"correctIndex":0,"explanation":"...","difficulty":"${difficulty}"}
+{"question":"...","options":["A","B","C","D"],"correctIndex":0,"explanation":"Brief justification.","difficulty":"${difficulty}"}
 - correctIndex is zero-based.
-- explanation should briefly justify the correct answer.`;
+- Keep each question concise and each explanation to 1–2 sentences.
+- For this batch, return exactly ${batchCount} complete objects.
+- Do not stop in the middle of an object. Return the complete JSON array.`;
 
       const text=await callAI([{role:'user',parts:[{text:prompt}]}],{
         maxOutputTokens: aiSettings.provider==='openrouter'
-          ? Math.min(1800, Math.max(1200, batchCount*520))
+          ? 2200
           : Math.min(16000, Math.max(5000, batchCount*700))
       });
       const rawList=parseAIQuestionJSON(text);
