@@ -70,15 +70,19 @@ async function callOpenAICompatible({ apiKey, url, model, messages, generationCo
   const payload = {
     model,
     messages,
-    temperature: 0.35,
-    max_completion_tokens: maxTokens
+    temperature: 0.2,
+    max_tokens: maxTokens
   };
 
   const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
+      'Authorization': `Bearer ${apiKey}`,
+      ...(providerName === 'OpenRouter' ? {
+        'HTTP-Referer': 'https://med64test.vercel.app',
+        'X-Title': 'MedEx Medical Examination Platform'
+      } : {})
     },
     body: JSON.stringify(payload)
   });
