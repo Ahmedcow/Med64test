@@ -1658,10 +1658,10 @@ const AI_PROVIDER_MODELS={
     {id:'gemini-3.6-flash',label:'Gemini 3.6 Flash — recommended for MCQ generation'}
   ],
   openrouter:[
-    {id:'openrouter/free',label:'OpenRouter Free Router — recommended'},
-    {id:'inclusionai/ling-3.0-flash-sante:free',label:'Ling 3.0 Flash Sante — medical (free)'},
-    {id:'nvidia/nemotron-3-ultra-550b-a55b:free',label:'NVIDIA Nemotron 3 Ultra — reasoning (free)'},
-    {id:'inclusionai/ling-3.0-tiny:free',label:'Ling 3.0 Tiny — fast (free)'}
+    {id:'openrouter/free',label:'OpenRouter Free Router — structured JSON (recommended)'},
+    {id:'google/gemma-4-31b-it:free',label:'Gemma 4 31B — free + JSON'},
+    {id:'inclusionai/ling-3.0-flash-sante:free',label:'Ling 3.0 Flash Sante — medical (JSON fallback)'},
+    {id:'nvidia/nemotron-3-ultra-550b-a55b:free',label:'NVIDIA Nemotron 3 Ultra — JSON fallback'}
   ]
 };
 
@@ -1918,7 +1918,7 @@ function parseAIQuestionJSON(text){
     }catch(_){}
   }
 
-  throw new Error('The AI returned incomplete JSON. OpenRouter free models do not enforce JSON output; MedEx now sends one question per request to prevent truncation. Please retry.');
+  throw new Error('The AI returned invalid JSON. MedEx now uses OpenRouter structured-output routing for MCQ generation. Please retry.');
 }
 function aiQuestionPreviewCard(q){
   const diffClass=(q.difficulty||'').toLowerCase();
@@ -2004,7 +2004,8 @@ Rules:
       const text=await callAI([{role:'user',parts:[{text:prompt}]}],{
         maxOutputTokens: aiSettings.provider==='openrouter'
           ? 2200
-          : Math.min(16000, Math.max(5000, batchCount*700))
+          : Math.min(16000, Math.max(5000, batchCount*700)),
+        jsonMode: aiSettings.provider==='openrouter'
       });
       const rawList=parseAIQuestionJSON(text);
       if(!rawList.length) throw new Error(`Batch ${bi+1} returned no questions.`);
