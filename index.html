@@ -1658,10 +1658,10 @@ const AI_PROVIDER_MODELS={
     {id:'gemini-3.6-flash',label:'Gemini 3.6 Flash — recommended for MCQ generation'}
   ],
   openrouter:[
-    {id:'google/gemini-3.1-pro-preview',label:'Gemini 3.1 Pro Preview'},
-    {id:'deepseek/deepseek-v3.2',label:'DeepSeek V3.2 — reasoning / value'},
-    {id:'qwen/qwen3.5-9b',label:'Qwen 3.5 9B — fast / low cost'},
-    {id:'mistralai/mistral-large-2512',label:'Mistral Large 3 — structured / reasoning'}
+    {id:'openrouter/free',label:'OpenRouter Free Router — recommended'},
+    {id:'inclusionai/ling-3.0-flash-sante:free',label:'Ling 3.0 Flash Sante — medical (free)'},
+    {id:'nvidia/nemotron-3-ultra-550b-a55b:free',label:'NVIDIA Nemotron 3 Ultra — reasoning (free)'},
+    {id:'inclusionai/ling-3.0-tiny:free',label:'Ling 3.0 Tiny — fast (free)'}
   ]
 };
 
@@ -1945,9 +1945,10 @@ ${JSON.stringify(sourceQuestions)}`;
     sourceBlock='Use your medical knowledge to create accurate original questions for the selected topic. Do not invent facts or cite nonexistent sources.';
   }
 
-  // Generate in small batches. Large JSON arrays are frequently truncated by AI providers,
-  // which was the cause of the "can't parse AI response in JSON" error.
-  const batchSize=Math.min(10,count);
+  // Generate in small batches. OpenRouter free/low-credit keys can reject a request
+  // before generation if max output tokens exceed the remaining credit allowance.
+  // Keep OpenRouter batches smaller and the requested output budget conservative.
+  const batchSize=aiSettings.provider==='openrouter' ? Math.min(3,count) : Math.min(10,count);
   const batches=[];
   for(let n=0;n<count;n+=batchSize) batches.push(Math.min(batchSize,count-n));
   const allRaw=[];
@@ -1983,7 +1984,9 @@ Rules:
 - explanation should briefly justify the correct answer.`;
 
       const text=await callAI([{role:'user',parts:[{text:prompt}]}],{
-        maxOutputTokens:Math.min(16000,Math.max(5000,batchCount*700))
+        maxOutputTokens: aiSettings.provider==='openrouter'
+          ? Math.min(1800, Math.max(1200, batchCount*520))
+          : Math.min(16000, Math.max(5000, batchCount*700))
       });
       const rawList=parseAIQuestionJSON(text);
       if(!rawList.length) throw new Error(`Batch ${bi+1} returned no questions.`);
