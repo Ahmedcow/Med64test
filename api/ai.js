@@ -33,7 +33,7 @@ export default async function handler(req, res) {
       result = await callOpenAICompatible({
         apiKey: process.env.OPENROUTER_API_KEY,
         url: 'https://openrouter.ai/api/v1/chat/completions',
-        model: model || 'google/gemini-3.1-pro-preview',
+        model: model || 'openrouter/free',
         messages,
         generationConfig,
         providerName: 'OpenRouter'
@@ -62,9 +62,10 @@ async function callOpenAICompatible({ apiKey, url, model, messages, generationCo
     throw new Error(`${providerName} API credentials are not configured in Vercel Environment Variables.`);
   }
 
-  const maxTokens = Number(generationConfig.maxOutputTokens) > 0
-    ? Math.min(Number(generationConfig.maxOutputTokens), 65536)
-    : 4096;
+  const requestedTokens = Number(generationConfig.maxOutputTokens);
+  const maxTokens = Number.isFinite(requestedTokens) && requestedTokens > 0
+    ? Math.min(requestedTokens, providerName === 'OpenRouter' ? 1800 : 65536)
+    : (providerName === 'OpenRouter' ? 1800 : 4096);
 
   const payload = {
     model,
@@ -85,7 +86,10 @@ async function callOpenAICompatible({ apiKey, url, model, messages, generationCo
   let data = null;
   try { data = await response.json(); } catch (_) {}
   if (!response.ok) {
-    const message = data?.error?.message || data?.error || `${providerName} returned HTTP ${response.status}.`;
+    let message = data?.error?.message || data?.error || `${providerName} returned HTTP ${response.status}.`;
+    if(providerName === 'OpenRouter' && response.status === 402){
+      message = `${message} For the free OpenRouter setup, select OpenRouter Free Router or a :free model. Paid models require available credits/key budget.`;
+    }
     const err = new Error(String(message));
     err.status = response.status;
     throw err;
