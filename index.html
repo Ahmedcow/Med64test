@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0c7c8c">
+<meta name="description" content="MedEx medical examination and study platform">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
 <title>MedEX — Medical Examination Platform</title>
 
 <!-- Vercel Web Analytics: enabled when deployed on Vercel -->
@@ -204,9 +208,17 @@ h1,h2,h3{font-family:var(--font-serif);font-weight:600;letter-spacing:-.01em;mar
 
 @media(max-width:1000px){.stats,.filters{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:700px){.main{padding:16px}.stats,.filters,.two,.three{grid-template-columns:1fr}.progress-row{grid-template-columns:1fr 1fr}}
+
+/* Phase 4: accessibility, mobile and offline UX */
+.skip-link{position:fixed;left:12px;top:-60px;z-index:9999;padding:10px 14px;border-radius:10px;background:var(--primary);color:#fff;font-weight:800;text-decoration:none}.skip-link:focus{top:12px}
+:focus-visible{outline:3px solid var(--primary2);outline-offset:3px}
+.offline-banner{position:fixed;top:0;left:0;right:0;z-index:9998;padding:8px 14px;text-align:center;background:var(--warn);color:#111;font-weight:800;font-size:13px}
+@media(max-width:700px){.topbar{padding-top:max(8px,env(safe-area-inset-top));min-height:calc(var(--topbar-h) + env(safe-area-inset-top))}.main{padding:12px}.card{border-radius:12px}.btn,.nav button{min-height:44px}.option{min-height:52px;padding:14px}.quiz-footer{position:sticky;bottom:8px;z-index:20;padding:8px;border-radius:12px;background:color-mix(in srgb,var(--card) 94%,transparent);backdrop-filter:blur(8px);box-shadow:var(--shadow-sm)}.question-nav{overflow-x:auto}.question-nav button{min-width:44px}.table-wrap{overflow-x:auto}.table{min-width:720px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 </style>
 </head>
 <body>
+<div id="offlineBanner" class="offline-banner" role="status" aria-live="polite" hidden>You are offline. Cached questions and saved exam data remain available.</div>
 <div class="app">
 <div class="scrim" id="scrim"></div>
 <aside class="sidebar" id="sidebar">
@@ -239,7 +251,7 @@ h1,h2,h3{font-family:var(--font-serif);font-weight:600;letter-spacing:-.01em;mar
     <div class="topbar-brand">MedEx<small>Medical Examination Platform</small></div>
   </header>
   <main class="main">
-  <div id="app"></div>
+  <div id="app" tabindex="-1"></div>
   </main>
 </div>
 </div>
@@ -702,7 +714,7 @@ async function loadFromGitHub(){
     }else{
       bank=[];
       render();
-      toast(`Could not load questions: ${e.message}`, 'error');
+      toast(navigator.onLine?`Could not load questions: ${e.message}`:'Offline and no saved question bank is available yet.', 'error');
     }
   }
 }
@@ -1778,33 +1790,37 @@ function exportHistory(){downloadBlob(JSON.stringify({exportedAt:new Date().toIS
 
 let aiTab='generate';
 
-async function callGemini(contents, generationConfig){
-  let res, data;
+async function callMultiAgent(payload){
+  let res,data;
   const headers={'Content-Type':'application/json'};
   if(aiSettings.accessCode) headers['x-access-code']=aiSettings.accessCode;
   try{
-    res=await fetch('/api/gemini',{
-      method:'POST',
-      headers,
-      body:JSON.stringify({contents, generationConfig, model: aiSettings.model || undefined})
-    });
-  }catch(e){
-    throw new Error('Could not reach the AI service. Check your connection.');
-  }
-  try{ data=await res.json(); }catch(e){ data=null; }
-  if(!res.ok){
-    throw new Error((data && data.error) || `HTTP ${res.status} from the AI service.`);
-  }
-  const text=data && data.text;
-  if(!text) throw new Error('The model returned an empty response.');
-  return text;
+    res=await fetch('/api/multi-agent',{method:'POST',headers,body:JSON.stringify(payload)});
+  }catch(e){ throw new Error('Could not reach the multi-agent AI service. Check your connection.'); }
+  try{data=await res.json();}catch(e){data=null;}
+  if(!res.ok) throw new Error((data&&data.error)||`HTTP ${res.status} from the AI service.`);
+  if(!data||!data.text) throw new Error('The multi-agent service returned an empty response.');
+  return data;
+}
+
+async function callGemini(contents,generationConfig){
+  // Kept for the chat feature; question generation uses the multi-agent endpoint.
+  let res,data;
+  const headers={'Content-Type':'application/json'};
+  if(aiSettings.accessCode) headers['x-access-code']=aiSettings.accessCode;
+  try{res=await fetch('/api/gemini',{method:'POST',headers,body:JSON.stringify({contents,generationConfig,model:aiSettings.model||undefined})});}
+  catch(e){throw new Error('Could not reach the AI service. Check your connection.');}
+  try{data=await res.json();}catch(e){data=null;}
+  if(!res.ok)throw new Error((data&&data.error)||`HTTP ${res.status} from the AI service.`);
+  if(!data||!data.text)throw new Error('The model returned an empty response.');
+  return data.text;
 }
 
 function renderAIAssistant(){
   const body=`
   <div class="card">
     <div class="category-head"><strong>Gemini AI</strong><span class="ai-badge">✦ Gemini 3.6</span></div>
-    <p class="mini" style="margin:8px 0 0">Questions and chat are powered by this site's own server (a Vercel serverless function). Nobody needs to bring a personal API key — the key lives only on the server and is never sent to or stored in your browser.</p>
+    <p class="mini" style="margin:8px 0 0">Question generation uses multiple independent medical AI agents plus a final critic/validator. API keys stay server-side and are never sent to the browser.</p>
     <details style="margin-top:10px">
       <summary class="mini" style="cursor:pointer;color:var(--primary2);font-weight:700">Advanced settings</summary>
       <div class="grid two" style="margin-top:10px">
@@ -1821,7 +1837,7 @@ function renderAIAssistant(){
   </div>
 
   ${aiTab==='generate'?aiGenerateTabHTML():aiChatTabHTML()}`;
-  document.getElementById('app').innerHTML=layout('AI Assistant','Generate practice questions or ask Gemini anything.',body);
+  document.getElementById('app').innerHTML=layout('AI Assistant','Generate practice questions or ask AI anything.',body);
   if(aiTab==='chat') scrollChatToBottom();
 }
 function setAITab(tab){ aiTab=tab; renderAIAssistant(); }
@@ -1829,7 +1845,7 @@ function setAITab(tab){ aiTab=tab; renderAIAssistant(); }
 function aiGenerateTabHTML(){
   const modules=getModules();
   return `<div class="card">
-    <h3 style="margin-top:0">Generate questions with Gemini 3.6 Flash</h3>
+    <h3 style="margin-top:0">Generate questions with Multi-Agent AI</h3>
     <p class="mini" style="margin:6px 0 14px">Choose from the modules, subjects and lectures that already exist in your website question bank. Then choose whether Gemini should use its medical knowledge or your website questions as the source.</p>
     <div class="grid three">
       <div class="field"><label>Module</label><select id="genModule" onchange="updateAIGeneratorSubjects()"><option value="">Select module</option>${modules.map(m=>`<option value="${attrJs(m)}">${esc(m)}</option>`).join('')}</select></div>
@@ -1911,7 +1927,7 @@ function updateAIGeneratorSourceUI(){
 
 function aiChatTabHTML(){
   return `<div class="card">
-    <div class="category-head"><strong>Ask Gemini anything</strong>${aiChat.length?'<button class="btn" onclick="clearAIChat()">Clear chat</button>':''}</div>
+    <div class="category-head"><strong>Ask AI anything</strong>${aiChat.length?'<button class="btn" onclick="clearAIChat()">Clear chat</button>':''}</div>
     <div class="chat-log" id="chatLog" style="margin-top:12px">${aiChat.length?aiChat.map(m=>`<div class="chat-msg ${m.role==='ai'?'ai':m.role==='error'?'error':'user'}">${esc(m.text)}</div>`).join(''):'<div class="empty">Ask a medical or exam-prep question to get started.</div>'}</div>
     <div class="chat-input-row">
       <textarea id="chatInput" placeholder="Ask anything…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAIChat();}"></textarea>
@@ -2017,7 +2033,7 @@ async function generateAIQuestions(){
   const resultBox=document.getElementById('genResult');
   aiBusy=true;
   if(btn){btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Generating…';}
-  if(resultBox) resultBox.innerHTML='<div class="card" style="margin-top:14px"><div class="mini">Contacting Gemini 3.6 Flash…</div></div>';
+  if(resultBox) resultBox.innerHTML='<div class="card" style="margin-top:14px"><div class="mini">Running independent medical agents and a final validator…</div></div>';
 
   let sourceBlock='';
   let reference='Gemini 3.6 Flash medical knowledge';
@@ -2062,8 +2078,8 @@ Rules:
 - explanation should briefly justify the correct answer.`;
 
   try{
-    const text=await callGemini([{role:'user',parts:[{text:prompt}]}],{maxOutputTokens:Math.min(12000,Math.max(2500,count*500))});
-    const rawList=parseAIQuestionJSON(text);
+    const agentResult=await callMultiAgent({module,subject,lecture,difficulty,thinkingLevel,count,sourceType,sourceQuestions:sourcePool.slice(0,80).map(q=>({question:q.question,options:q.options,correctAnswer:q.options[q.correctIndex],explanation:q.explanation}))});
+    const rawList=parseAIQuestionJSON(agentResult.text);
     if(!rawList.length) throw new Error('No questions were returned. Try again or adjust your selections.');
 
     const stamped=rawList.slice(0,count).map((raw,i)=>normalizeQuestion({
@@ -2089,9 +2105,9 @@ Rules:
 
     if(resultBox) resultBox.innerHTML=`<div class="card" style="margin-top:14px"><div class="notice ok">Generated ${unique.length} new question${unique.length===1?'':'s'}${duplicates?` · ${duplicates} duplicate${duplicates===1?'':'s'} skipped`:''}.</div>
     <div class="mini" style="margin-top:8px">${esc(module+' AI generated')} · ${esc(subject)} · ${esc(lecture)}</div>
-    <div style="margin-top:12px">${stamped.map(q=>aiQuestionPreviewCard(q)).join('')}</div>
+    <div style="margin-top:12px">${unique.map(q=>aiQuestionPreviewCard(q)).join('')}</div>
     <div class="actions" style="margin-top:12px"><button class="btn primary" onclick="go('aiquestions')">Review in AI Questions</button></div></div>`;
-    toast(`Generated ${stamped.length} questions with Gemini 3.6 Flash.`,'ok');
+    toast(`Generated ${unique.length} questions using ${agentResult.agents||'multiple AI agents'}.`,'ok');
   }catch(e){
     if(resultBox) resultBox.innerHTML=`<div class="card" style="margin-top:14px"><div class="notice error">Generation failed: ${esc(e.message)}</div></div>`;
     toast('Gemini generation failed: '+e.message,'error');
@@ -2292,6 +2308,13 @@ async function uploadAIQuestionsToSupabase(){
 }
 
 function exportAIQuestions(){downloadBlob(JSON.stringify(aiQuestions,null,2),'med64-ai-questions.json','application/json');}
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(e=>console.warn('Service worker registration failed:',e)));
+}
+function updateOfflineStatus(){const b=document.getElementById('offlineBanner');if(b)b.hidden=navigator.onLine;}
+window.addEventListener('online',updateOfflineStatus);window.addEventListener('offline',updateOfflineStatus);
+updateOfflineStatus();
 
 document.addEventListener('DOMContentLoaded',()=>{
   applyTheme();
