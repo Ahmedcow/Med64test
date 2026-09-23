@@ -607,12 +607,25 @@ async function fetchJSON(url){
 async function loadQuestionsFromSupabase(){
   if(!SUPABASE_ENABLED)return false;
   try{
-    const {data,error}=await supabaseClient
-      .from('questions')
-      .select('id,module,subject,lecture,question,options,correct_index,explanation,difficulty,reference');
-    if(error)throw error;
-    if(!Array.isArray(data))throw new Error('Invalid questions response.');
-    const all=data.map(q=>normalizeQuestion({
+    // Supabase/PostgREST commonly caps a single request at 1,000 rows.
+    // Fetch the table in pages so MedEx can load 1,001+ questions too.
+    const PAGE_SIZE=1000;
+    const rows=[];
+    for(let from=0;;from+=PAGE_SIZE){
+      const to=from+PAGE_SIZE-1;
+      const {data,error}=await supabaseClient
+        .from('questions')
+        .select('id,module,subject,lecture,question,options,correct_index,explanation,difficulty,reference')
+        .order('id',{ascending:true})
+        .range(from,to);
+      if(error)throw error;
+      if(!Array.isArray(data))throw new Error('Invalid questions response.');
+      rows.push(...data);
+      if(data.length<PAGE_SIZE)break;
+      // Safety guard: prevents an accidental endless loop if a provider misbehaves.
+      if(rows.length>100000)throw new Error('Question bank exceeds the supported 100,000-question safety limit.');
+    }
+    const all=rows.map(q=>normalizeQuestion({
       id:q.id,module:q.module,subject:q.subject,lecture:q.lecture,question:q.question,
       options:q.options,correctIndex:q.correct_index,explanation:q.explanation,
       difficulty:q.difficulty,reference:q.reference,source:'Supabase'
@@ -669,7 +682,7 @@ async function loadFromGitHub(){
     localStorage.setItem(CONFIG.cacheKey, JSON.stringify({updatedAt:new Date().toISOString(),sourceFiles,bank}));
     lastSync=new Date();
     render();
-    toast(`Loaded ${all.length} GitHub questions${retainedLocal.length?` + ${retainedLocal.length} local questions`:''}.`, 'ok');
+    toast(`Loaded ${all.length.toLocaleString()} GitHub questions${retainedLocal.length?` + ${retainedLocal.length.toLocaleString()} local questions`:''}.`, 'ok');
   }catch(e){
     const cached=loadJSON(CONFIG.cacheKey,null);
     if(cached && Array.isArray(cached.bank)){
@@ -733,7 +746,7 @@ function layout(title,subtitle,body,actions=''){
 function render(){
   updateSidebarFoot();
   const view=location.hash.replace('#','')||'dashboard';
-  const allowed=['dashboard','exam','progress','mistakes','bank','import','ai','aiquestions','settings','account','results','history'];
+  const allowed=['dashboard','exam','progress','history','mistakes','study','weak','favorites','bank','import','ai','aiquestions','settings','account','results'];
   const v=allowed.includes(view)?view:'dashboard';
   document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
   const adminNav=document.getElementById('adminNav'); if(adminNav) adminNav.style.display=isAdmin?'flex':'none';
@@ -1357,11 +1370,22 @@ function renderBank(){
   document.getElementById('app').innerHTML=layout('Question Bank','Questions are loaded from Supabase when connected, with GitHub as a fallback.',body);
   filterBank();
 }
+let bankPage=1;
+const BANK_PAGE_SIZE=100;
 function filterBank(){
   const s=(document.getElementById('bankSearch')?.value||'').toLowerCase(),mod=document.getElementById('bankModule')?.value||'',subj=document.getElementById('bankSubject')?.value||'',lect=document.getElementById('bankLecture')?.value||'',src=document.getElementById('bankSource')?.value||'';
   const list=bank.filter(q=>(!s||[q.id,q.question,q.subject,q.module,q.lecture].join(' ').toLowerCase().includes(s))&&(!mod||q.module===mod)&&(!subj||q.subject===subj)&&(!lect||q.lecture===lect)&&(!src||q.source===src));
   const rows=document.getElementById('bankRows');if(!rows)return;
-  rows.innerHTML=list.slice(0,500).map(q=>`<tr><td><b>${esc(q.id)}</b></td><td>${esc(q.module)}</td><td>${esc(q.subject)}</td><td>${esc(q.lecture)}</td><td>${esc(q.question)}</td><td>${progressFor([q])}% · ${accuracyFor([q])}% acc.</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No matching questions.</td></tr>';
+  const pages=Math.max(1,Math.ceil(list.length/BANK_PAGE_SIZE));
+  bankPage=Math.min(Math.max(1,bankPage),pages);
+  const start=(bankPage-1)*BANK_PAGE_SIZE;
+  rows.innerHTML=list.slice(start,start+BANK_PAGE_SIZE).map(q=>`<tr><td><b>${esc(q.id)}</b></td><td>${esc(q.module)}</td><td>${esc(q.subject)}</td><td>${esc(q.lecture)}</td><td>${esc(q.question)}</td><td>${progressFor([q])}% · ${accuracyFor([q])}% acc.</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No matching questions.</td></tr>';
+  const table=rows.closest('.table-wrap');
+  if(table){
+    let pager=document.getElementById('bankPager');
+    if(!pager){pager=document.createElement('div');pager.id='bankPager';pager.className='actions';pager.style.marginTop='12px';table.parentElement.appendChild(pager);}
+    pager.innerHTML=`<span class="mini">Showing ${list.length?start+1:0}–${Math.min(start+BANK_PAGE_SIZE,list.length)} of ${list.length.toLocaleString()} matching questions</span><button class="btn" ${bankPage<=1?'disabled':''} onclick="bankPage--;filterBank()">Previous</button><span class="pill">Page ${bankPage} / ${pages}</span><button class="btn" ${bankPage>=pages?'disabled':''} onclick="bankPage++;filterBank()">Next</button>`;
+  }
 }
 
 function renderImport(){
