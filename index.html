@@ -232,12 +232,12 @@ h1,h2,h3{font-family:var(--font-serif);font-weight:600;letter-spacing:-.01em;mar
       <button data-view="exam"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="12" height="15" rx="2"/><rect x="7" y="1.3" width="6" height="3" rx="1"/><line x1="7" y1="9" x2="13" y2="9"/><line x1="7" y1="12.4" x2="13" y2="12.4"/><line x1="7" y1="15.8" x2="10.5" y2="15.8"/></svg><span>Start Exam</span></button>
       <button data-view="progress"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="2.5,15 7,9.5 10.5,12.5 17.5,4"/><polyline points="12.5,4 17.5,4 17.5,9"/></svg><span>Progress & Accuracy</span></button>
       <button data-view="history"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10.5" r="7.5"/><polyline points="10,6 10,10.5 13.2,12.6"/><polyline points="3.5,2 3.5,5 6.5,5"/></svg><span>Exam History</span></button>
-      <button data-view="analytics"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="17" x2="4" y2="9"/><line x1="10" y1="17" x2="10" y2="4"/><line x1="16" y1="17" x2="16" y2="7"/><line x1="2.5" y1="17" x2="17.5" y2="17"/></svg><span>Analytics</span></button>
       <button data-view="mistakes"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.5"/><line x1="7.3" y1="7.3" x2="12.7" y2="12.7"/><line x1="12.7" y1="7.3" x2="7.3" y2="12.7"/></svg><span>Mistakes</span></button>
       <button data-view="weak"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,14 7,10 10,12 17,5"/><polyline points="13,5 17,5 17,9"/></svg><span>Weak Topics</span></button>
       <button data-view="favorites"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linejoin="round"><path d="M10 16.8 3.6 10.4A4.1 4.1 0 0 1 9.4 4.6L10 5.2l.6-.6a4.1 4.1 0 0 1 5.8 5.8L10 16.8Z"/></svg><span>Favorites</span></button>
       <button data-view="bank" id="bankNav"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polygon points="10,2 18,6.5 10,11 2,6.5"/><polyline points="2,10.5 10,15 18,10.5"/><polyline points="2,14.5 10,19 18,14.5"/></svg><span>Question Bank</span></button>
       <button data-view="import" id="adminNav" style="display:none"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13V2.5"/><polyline points="6,6.5 10,2.5 14,6.5"/><path d="M3 13v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg><span>Upload / Update Questions</span></button>
+      <button data-view="analytics" id="analyticsNav" style="display:none"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="17" x2="3" y2="9"/><line x1="9" y1="17" x2="9" y2="5"/><line x1="15" y1="17" x2="15" y2="2"/><line x1="2" y1="17" x2="18" y2="17"/></svg><span>Analytics</span></button>
       <button data-view="ai"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2.5 L11.6 7.2 L16.2 8.8 L11.6 10.4 L10 15.1 L8.4 10.4 L3.8 8.8 L8.4 7.2 Z"/><path d="M16 2.5 L16.7 4.4 L18.6 5.1 L16.7 5.8 L16 7.7 L15.3 5.8 L13.4 5.1 L15.3 4.4 Z"/></svg><span>AI Assistant</span></button>
       <button data-view="aiquestions"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="14" height="4" rx="1.2"/><rect x="3" y="8.5" width="14" height="4" rx="1.2"/><rect x="3" y="14" width="14" height="4" rx="1.2"/><circle cx="6" cy="5" r=".6" fill="currentColor"/><circle cx="6" cy="10.5" r=".6" fill="currentColor"/><circle cx="6" cy="16" r=".6" fill="currentColor"/></svg><span>AI Questions</span></button>
       <button data-view="settings"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round"><line x1="2" y1="5" x2="18" y2="5"/><circle cx="13" cy="5" r="2"/><line x1="2" y1="10" x2="18" y2="10"/><circle cx="7" cy="10" r="2"/><line x1="2" y1="15" x2="18" y2="15"/><circle cx="14" cy="15" r="2"/></svg><span>Settings</span></button>
@@ -503,6 +503,70 @@ async function loadGlobalAnalytics(){
   }
 }
 
+
+async function getAnalyticsAccessToken(){
+  if(!SUPABASE_ENABLED || !currentUser) return '';
+  try{
+    const {data}=await supabaseClient.auth.getSession();
+    return data?.session?.access_token || '';
+  }catch(e){ return ''; }
+}
+
+function getAnonymousVisitorId(){
+  const k='med64_analytics_visitor_v1';
+  let id=localStorage.getItem(k);
+  if(!id){
+    id=(crypto?.randomUUID?crypto.randomUUID():'anon_'+Date.now()+'_'+Math.random().toString(36).slice(2));
+    localStorage.setItem(k,id);
+  }
+  return id;
+}
+
+async function trackAnalyticsEvent(type,eventId){
+  try{
+    const token=await getAnalyticsAccessToken();
+    const payload={eventType:type,eventId:String(eventId||''),visitorId:getAnonymousVisitorId()};
+    const headers={'Content-Type':'application/json'};
+    if(token) headers.Authorization='Bearer '+token;
+    const r=await fetch('/api/analytics',{method:'POST',headers,body:JSON.stringify(payload),keepalive:true});
+    if(!r.ok){const d=await r.json().catch(()=>null); console.warn('Analytics event failed:',d?.error||r.status);}
+  }catch(e){ console.warn('Analytics event unavailable:',e.message); }
+}
+
+async function loadAdminUsageAnalytics(){
+  if(!isAdmin) return null;
+  try{
+    const token=await getAnalyticsAccessToken();
+    if(!token) throw new Error('Admin session is missing.');
+    const r=await fetch('/api/analytics',{headers:{Authorization:'Bearer '+token}});
+    const d=await r.json().catch(()=>null);
+    if(!r.ok) throw new Error(d?.error||`HTTP ${r.status}`);
+    return d;
+  }catch(e){
+    console.warn('Admin analytics unavailable:',e.message);
+    return {error:e.message,submittedExams:0,answeredQuestions:0};
+  }
+}
+
+async function renderAdminAnalytics(){
+  if(!isAdmin){
+    document.getElementById('app').innerHTML=layout('Analytics','Restricted to administrators.',`<div class="card"><div class="notice error">Admin access required.</div></div>`);
+    return;
+  }
+  const body=`<div class="card"><div class="category-head"><div><h3 style="margin:0">Site usage analytics</h3><div class="mini" style="margin-top:6px">Counts include both signed-in and non-signed-in users. Only submitted exams and answered questions are collected.</div></div><button class="btn primary" onclick="refreshAdminAnalytics()">Refresh</button></div></div>
+  <div id="adminUsageAnalytics" class="grid two" style="margin-top:16px"><div class="card stat"><div class="label">Submitted exams</div><div class="value">…</div></div><div class="card stat"><div class="label">Answered questions</div><div class="value">…</div></div></div>
+  <div class="mini" style="margin-top:12px">No question text, answers, scores, email addresses, or other student details are displayed on this page.</div>`;
+  document.getElementById('app').innerHTML=layout('Analytics','Administrator-only aggregate usage counts.',body);
+  await refreshAdminAnalytics();
+}
+async function refreshAdminAnalytics(){
+  const el=document.getElementById('adminUsageAnalytics'); if(!el)return;
+  el.innerHTML='<div class="card"><div class="mini">Loading analytics…</div></div>';
+  const d=await loadAdminUsageAnalytics();
+  if(d?.error){el.innerHTML=`<div class="card" style="grid-column:1/-1"><div class="notice error">${esc(d.error)}</div><div class="mini" style="margin-top:8px">Make sure the analytics SQL table/policies and the Vercel SUPABASE_SERVICE_ROLE_KEY are configured.</div></div>`;return;}
+  el.innerHTML=`<div class="card stat"><div class="label">Submitted exams</div><div class="value">${Number(d?.submittedExams||0).toLocaleString()}</div></div><div class="card stat"><div class="label">Answered questions</div><div class="value">${Number(d?.answeredQuestions||0).toLocaleString()}</div></div>`;
+}
+
 function globalModuleStats(module){
   return (globalAnalytics.modules||[]).find(x=>x.module===module) || {students:0,submitted_exams:0,average_score:0};
 }
@@ -762,22 +826,23 @@ function layout(title,subtitle,body,actions=''){
 function render(){
   updateSidebarFoot();
   const view=location.hash.replace('#','')||'dashboard';
-  const allowed=['dashboard','exam','progress','history','analytics','mistakes','weak','favorites','bank','import','ai','aiquestions','settings','account','results'];
+  const allowed=['dashboard','exam','progress','history','mistakes','weak','favorites','bank','import','analytics','ai','aiquestions','settings','account','results'];
   const v=allowed.includes(view)?view:'dashboard';
   document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
   const adminNav=document.getElementById('adminNav'); if(adminNav) adminNav.style.display=isAdmin?'flex':'none';
   const bankNav=document.getElementById('bankNav'); if(bankNav) bankNav.style.display=isAdmin?'flex':'none';
+  const analyticsNav=document.getElementById('analyticsNav'); if(analyticsNav) analyticsNav.style.display=isAdmin?'flex':'none';
   if(v==='bank' && !isAdmin){ location.hash='dashboard'; return; }
   if(v==='dashboard') renderDashboard();
   else if(v==='exam') renderExamSetup();
   else if(v==='progress') renderProgress();
   else if(v==='history') renderHistory();
-  else if(v==='analytics') renderAnalytics();
   else if(v==='mistakes') renderMistakes();
   else if(v==='weak') renderWeakTopics();
   else if(v==='favorites') renderFavorites();
   else if(v==='bank') renderBank();
   else if(v==='import') renderImport();
+  else if(v==='analytics') renderAdminAnalytics();
   else if(v==='ai') renderAIAssistant();
   else if(v==='aiquestions') renderAIQuestions();
   else if(v==='settings') renderSettings();
@@ -1162,6 +1227,13 @@ async function submitExam(auto){
     blueprint:exam.blueprint||null
   };
 
+  // Shared aggregate analytics: works for signed-in and anonymous users.
+  trackAnalyticsEvent('exam_submitted',result.id);
+  for(const q of exam.list){
+    if(exam.answers[q.id]===undefined) continue;
+    trackAnalyticsEvent('question_answered',`${result.id}:${q.id}`);
+  }
+
   if(SUPABASE_ENABLED && currentUser){
     await saveExamToSupabase(result);
     for(const q of exam.list){
@@ -1260,53 +1332,6 @@ function renderResults(){
   <div class="grid two" style="margin-top:16px"><div class="card"><h2 class="section-title">By subject</h2>${analysis(bySubject)}</div><div class="card"><h2 class="section-title">By difficulty</h2>${analysis(byDifficulty)}</div></div>
   <h2 class="section-title">Review Exam</h2><div>${rows}</div><div class="actions" style="margin-top:14px"><button class="btn primary" onclick="go('exam')">New Exam</button><button class="btn" onclick="go('history')">Exam History</button><button class="btn" onclick="go('progress')">View Progress</button></div>`;
   document.getElementById('app').innerHTML=layout('Exam Results',r.auto?'Time expired — exam submitted automatically.':'Exam completed.',body);
-}
-
-function renderAnalytics(){
-  const hist=loadJSON(CONFIG.historyKey,[]);
-  const totalExams=hist.length;
-  const answered=hist.reduce((n,e)=>n+Number(e.answered||0),0);
-  const correct=hist.reduce((n,e)=>n+Number(e.correct||0),0);
-  const wrong=Math.max(0,answered-correct);
-  const accuracy=answered?Math.round(correct/answered*100):0;
-  const avgScore=totalExams?Math.round(hist.reduce((n,e)=>n+Number(e.accuracy||0),0)/totalExams):0;
-  const totalTime=hist.reduce((n,e)=>n+Number(e.durationSec||0),0);
-  const activeDays=new Set(hist.map(e=>String(e.date||'').slice(0,10)).filter(Boolean)).size;
-  const moduleStats={};
-  hist.forEach(e=>{
-    (e.list||[]).forEach(q=>{
-      const a=e.answers?.[q.id];
-      if(a===undefined)return;
-      const m=q.module||'Unspecified';
-      if(!moduleStats[m])moduleStats[m]={answered:0,correct:0};
-      moduleStats[m].answered++;
-      if(a===q.correctIndex)moduleStats[m].correct++;
-    });
-  });
-  const moduleRows=Object.entries(moduleStats).sort((a,b)=>a[0].localeCompare(b[0])).map(([m,x])=>{
-    const pct=x.answered?Math.round(x.correct/x.answered*100):0;
-    return `<div class="progress-row" style="grid-template-columns:1fr 100px 90px"><span><b>${esc(m)}</b><div class="mini">${x.correct}/${x.answered} correct</div></span><div><div class="bar"><i style="width:${pct}%"></i></div></div><span class="pill">${pct}%</span></div>`;
-  }).join('')||'<div class="empty">Complete an exam to build your local analytics.</div>';
-  const recent=hist.slice(0,10).map(e=>`<tr><td>${esc(e.label||'Exam')}</td><td>${e.correct||0}/${e.total||0}</td><td>${Number(e.accuracy||0)}%</td><td>${e.date?new Date(e.date).toLocaleString():''}</td></tr>`).join('')||'<tr><td colspan="4">No submitted exams yet.</td></tr>';
-  const body=`
-    <div class="notice" style="margin-bottom:16px">${currentUser?'These figures include exams saved in this browser. Your signed-in cloud history remains available on the History page.':'You are not signed in. These analytics are stored only in this browser and do not require an account.'}</div>
-    <div class="grid stats">
-      <div class="card stat"><div class="label">Submitted exams</div><div class="value">${totalExams}</div></div>
-      <div class="card stat"><div class="label">Average exam score</div><div class="value">${avgScore}%</div></div>
-      <div class="card stat"><div class="label">Questions answered</div><div class="value">${answered}</div></div>
-      <div class="card stat"><div class="label">Accuracy</div><div class="value">${correct}/${answered}</div><div class="mini">${accuracy}% · ${wrong} wrong</div></div>
-    </div>
-    <div class="grid two" style="margin-top:16px">
-      <div class="card"><h3 style="margin-top:0">Study activity</h3><div class="progress-row" style="grid-template-columns:1fr 100px"><span>Active exam days</span><b>${activeDays}</b></div><div class="progress-row" style="grid-template-columns:1fr 100px"><span>Total study time</span><b>${formatTime(totalTime)}</b></div></div>
-      <div class="card"><h3 style="margin-top:0">Local storage</h3><p class="mini">Analytics use the same browser history already used for your exam results. Clearing site data will remove these anonymous analytics.</p><button class="btn" onclick="exportLocalAnalytics()">Export analytics</button></div>
-    </div>
-    <h2 class="section-title">Performance by module</h2><div class="card">${moduleRows}</div>
-    <h2 class="section-title">Recent local exams</h2><div class="card table-wrap"><table class="table"><thead><tr><th>Exam</th><th>Score</th><th>Accuracy</th><th>Date</th></tr></thead><tbody>${recent}</tbody></table></div>`;
-  document.getElementById('app').innerHTML=layout('Analytics','Personal analytics that work for signed-in and non-sign-in users.',body);
-}
-function exportLocalAnalytics(){
-  const hist=loadJSON(CONFIG.historyKey,[]);
-  downloadBlob(JSON.stringify({exportedAt:new Date().toISOString(),anonymous:!currentUser,history:hist,progress},null,2),'medex-local-analytics.json','application/json');
 }
 
 function renderProgress(){
@@ -1840,16 +1865,20 @@ function exportHistory(){downloadBlob(JSON.stringify({exportedAt:new Date().toIS
 let aiTab='generate';
 
 async function callMultiAgent(payload){
-  let res,data;
-  const headers={'Content-Type':'application/json'};
-  if(aiSettings.accessCode) headers['x-access-code']=aiSettings.accessCode;
-  try{
-    res=await fetch('/api/multi-agent',{method:'POST',headers,body:JSON.stringify(payload)});
-  }catch(e){ throw new Error('Could not reach the multi-agent AI service. Check your connection.'); }
-  try{data=await res.json();}catch(e){data=null;}
-  if(!res.ok) throw new Error((data&&data.error)||`HTTP ${res.status} from the AI service.`);
-  if(!data||!data.text) throw new Error('The multi-agent service returned an empty response.');
-  return data;
+  const sourceText=payload.sourceType==='website'
+    ? `Use these website questions only as source material and create new questions without copying them:\n${JSON.stringify(payload.sourceQuestions||[]).slice(0,50000)}`
+    : 'Use accurate medical knowledge.';
+  const prompt=`You are the medical question generator for MedEx. Generate exactly ${payload.count||5} original multiple-choice questions.
+Module: ${payload.module||''}
+Subject: ${payload.subject||''}
+Lecture: ${payload.lecture||''}
+Difficulty: ${payload.difficulty||'Mixed'}
+Thinking level: ${payload.thinkingLevel||'Higher-order thinking'}
+${sourceText}
+Rules: exactly 4 options; exactly one correct answer; clinically accurate; prefer Apply/Analyze/Evaluate clinical reasoning; plausible distractors; no copied source wording; stay focused on the selected lecture; return ONLY a JSON array.
+Each item: {"question":"...","options":["...","...","...","..."],"correctIndex":0,"explanation":"...","difficulty":"..."}`;
+  const text=await callGemini([{role:'user',parts:[{text:prompt}]}],{maxOutputTokens:8192,responseMimeType:'application/json'});
+  return {text,agents:'Gemini'};
 }
 
 async function callGemini(contents,generationConfig){
@@ -2127,9 +2156,8 @@ Rules:
 - explanation should briefly justify the correct answer.`;
 
   try{
-    const websiteQuestions=sourcePool.slice(0,80).map(q=>({question:q.question,options:q.options,correctAnswer:q.options[q.correctIndex],explanation:q.explanation}));
-    const agentResultText=await callGemini([{role:'user',parts:[{text:prompt}]}],{maxOutputTokens:8192,responseMimeType:'application/json'});
-    const rawList=parseAIQuestionJSON(agentResultText);
+    const agentResult=await callMultiAgent({module,subject,lecture,difficulty,thinkingLevel,count,sourceType,sourceQuestions:sourcePool.slice(0,80).map(q=>({question:q.question,options:q.options,correctAnswer:q.options[q.correctIndex],explanation:q.explanation}))});
+    const rawList=parseAIQuestionJSON(agentResult.text);
     if(!rawList.length) throw new Error('No questions were returned. Try again or adjust your selections.');
 
     const stamped=rawList.slice(0,count).map((raw,i)=>normalizeQuestion({
@@ -2157,7 +2185,7 @@ Rules:
     <div class="mini" style="margin-top:8px">${esc(module+' AI generated')} · ${esc(subject)} · ${esc(lecture)}</div>
     <div style="margin-top:12px">${unique.map(q=>aiQuestionPreviewCard(q)).join('')}</div>
     <div class="actions" style="margin-top:12px"><button class="btn primary" onclick="go('aiquestions')">Review in AI Questions</button></div></div>`;
-    toast(`Generated ${unique.length} questions with Gemini.`,'ok');
+    toast(`Generated ${unique.length} questions using ${agentResult.agents||'multiple AI agents'}.`,'ok');
   }catch(e){
     if(resultBox) resultBox.innerHTML=`<div class="card" style="margin-top:14px"><div class="notice error">Generation failed: ${esc(e.message)}</div></div>`;
     toast('Gemini generation failed: '+e.message,'error');
