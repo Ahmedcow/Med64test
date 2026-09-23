@@ -1,0 +1,32 @@
+MedEx Phase 5 setup
+===================
+
+1) Deploy these files at the Vercel project root:
+   - index.html
+   - manifest.webmanifest
+   - sw.js
+   - icons/icon-192.png
+   - icons/icon-512.png
+   - api/gemini.js
+   - api/multi-agent.js
+
+2) Vercel Environment Variable:
+   GEMINI_API_KEY = your Google AI Studio Gemini API key
+   Optional: GEMINI_MODEL = gemini-3.8-flash
+
+   Do NOT put the Gemini key inside index.html.
+
+3) Supabase:
+   Open SQL Editor and run phase5_supabase.sql once.
+   This creates:
+   - question_reports
+   - question_versions
+   - question_backups
+   - admin analytics/report/version RPC functions
+
+4) PWA:
+   Use HTTPS/Vercel and deploy the manifest, service worker, and both icons.
+   The supplied bundle uses index.html as the app entry point.
+
+5) Admin:
+   Sign in with the existing admin account. The new Admin Analytics page is visible only to admins.
