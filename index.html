@@ -570,26 +570,83 @@ function normalizeQuestion(q, source=''){
     source: source || String(q.source || '')
   };
 }
-function validateQuestion(q, i){
+function validateQuestion(q, i, options={}){
+  const requireExplanation=options.requireExplanation===true;
   if(!q.id) return 'Missing id';
   if(!q.question) return 'Missing question';
-  if(!Array.isArray(q.options) || q.options.length < 2) return 'At least 2 options required';
+  if(!Array.isArray(q.options) || q.options.length !== 4) return 'Exactly 4 options required';
+  if(q.options.some(x=>!String(x||'').trim())) return 'Every option must contain text';
+  const normalizedOptions=q.options.map(x=>String(x).trim().toLowerCase());
+  if(new Set(normalizedOptions).size !== normalizedOptions.length) return 'Duplicate answer options';
   if(!Number.isInteger(q.correctIndex) || q.correctIndex < 0 || q.correctIndex >= q.options.length) return 'Invalid correctIndex';
   if(!q.module) return 'Missing module';
   if(!q.subject) return 'Missing subject';
   if(!q.lecture) return 'Missing lecture';
+  if(requireExplanation && !q.explanation) return 'Missing explanation';
   return '';
 }
-function validateBank(list){
+function validateBank(list, options={}){
   const errors=[], seen=new Set();
   list.forEach((raw,i)=>{
     const q=normalizeQuestion(raw, raw.source);
-    const err=validateQuestion(q,i);
+    const err=validateQuestion(q,i,options);
     if(err) errors.push(`Question ${i+1} (${q.id||'no id'}): ${err}`);
     if(q.id && seen.has(q.id)) errors.push(`Duplicate question ID: ${q.id}`);
     if(q.id) seen.add(q.id);
   });
   return errors;
+}
+function normalizeCompareText(value){
+  return String(value||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+}
+function questionFingerprint(q){ return normalizeCompareText(q.question); }
+function questionSimilarity(a,b){
+  const A=new Set(questionFingerprint(a).split(' ').filter(w=>w.length>2));
+  const B=new Set(questionFingerprint(b).split(' ').filter(w=>w.length>2));
+  if(!A.size||!B.size)return 0;
+  let intersection=0; for(const token of A)if(B.has(token))intersection++;
+  return intersection/(A.size+B.size-intersection);
+}
+function findQuestionDuplicate(candidate, existing, threshold=0.92){
+  const fp=questionFingerprint(candidate); if(!fp)return null;
+  for(const q of existing) if(questionFingerprint(q)===fp)return {type:'exact',question:q,score:1};
+  for(const q of existing){
+    if(candidate.module!==q.module||candidate.subject!==q.subject||candidate.lecture!==q.lecture)continue;
+    const qfp=questionFingerprint(q);
+    if(Math.abs(fp.length-qfp.length)>Math.max(fp.length,qfp.length)*0.35)continue;
+    const score=questionSimilarity(candidate,q);
+    if(score>=threshold)return {type:'near',question:q,score};
+  }
+  return null;
+}
+function analyzeQuestionBank(list){
+  const normalized=list.map((raw,i)=>normalizeQuestion(raw,raw.source));
+  const invalid=[],idMap=new Map(),textMap=new Map(),duplicateIds=[],duplicateTexts=[],duplicateOptions=[],missingExplanations=[];
+  normalized.forEach((q,i)=>{
+    const err=validateQuestion(q,i); if(err)invalid.push(`Question ${i+1} (${q.id||'no id'}): ${err}`);
+    if(q.id){if(idMap.has(q.id))duplicateIds.push(q.id);else idMap.set(q.id,q);}
+    const fp=questionFingerprint(q); if(fp){if(textMap.has(fp))duplicateTexts.push({id:q.id,other:textMap.get(fp).id});else textMap.set(fp,q);}
+    const opts=q.options.map(x=>normalizeCompareText(x)); if(opts.length===4&&new Set(opts).size!==4)duplicateOptions.push(q.id||`Question ${i+1}`);
+    if(!q.explanation)missingExplanations.push(q.id||`Question ${i+1}`);
+  });
+  return {total:normalized.length,invalid,duplicateIds:[...new Set(duplicateIds)],duplicateTexts,duplicateOptions,missingExplanations};
+}
+function renderBankHealth(){
+  const el=document.getElementById('bankHealth');if(!el)return;
+  const stats=analyzeQuestionBank(allQuestionBank.length?allQuestionBank:bank);
+  const issues=[
+    stats.invalid.length?`${stats.invalid.length} validation error${stats.invalid.length===1?'':'s'}`:'',
+    stats.duplicateIds.length?`${stats.duplicateIds.length} duplicate ID${stats.duplicateIds.length===1?'':'s'}`:'',
+    stats.duplicateTexts.length?`${stats.duplicateTexts.length} duplicate question${stats.duplicateTexts.length===1?'':'s'}`:'',
+    stats.duplicateOptions.length?`${stats.duplicateOptions.length} question${stats.duplicateOptions.length===1?'':'s'} with duplicate options`:''
+  ].filter(Boolean);
+  const good=!issues.length, tone=good?'ok':'error';
+  const examples=[...stats.invalid.slice(0,3),...stats.duplicateIds.slice(0,3).map(x=>`Duplicate ID: ${x}`),...stats.duplicateTexts.slice(0,3).map(x=>`Duplicate text: ${x.id} ↔ ${x.other}`),...stats.duplicateOptions.slice(0,3).map(x=>`Duplicate options: ${x}`)];
+  el.innerHTML=`<div class="category-head"><div><b>Question Bank Health</b><div class="mini">Scanned ${stats.total.toLocaleString()} loaded questions.</div></div><button class="btn" onclick="renderBankHealth()">Scan again</button></div>
+  <div class="notice ${tone}" style="margin-top:12px"><b>${good?'Health check passed':'Attention needed'}</b> · ${esc(issues.join(' · ')||'No structural or duplicate-content problems detected.')}</div>
+  <div class="grid three" style="margin-top:12px"><div class="card stat"><div class="label">Valid structure</div><div class="value">${stats.total-stats.invalid.length}</div></div><div class="card stat"><div class="label">Missing explanations</div><div class="value">${stats.missingExplanations.length}</div></div><div class="card stat"><div class="label">Duplicate content</div><div class="value">${stats.duplicateTexts.length}</div></div></div>
+  ${examples.length?`<div class="mini" style="margin-top:12px;white-space:pre-wrap">${esc(examples.join('\n'))}</div>`:''}
+  ${stats.missingExplanations.length?`<div class="mini" style="margin-top:8px">Questions without explanations: ${esc(stats.missingExplanations.slice(0,12).join(', '))}${stats.missingExplanations.length>12?' …':''}</div>`:''}`;
 }
 
 async function fetchJSON(url){
@@ -1297,6 +1354,10 @@ function renderImport(){
   <div id="importPreview" class="card" style="margin-top:16px"><div class="empty">Add a question above, or preview a JSON set here.</div></div>
 
   <div class="card" style="margin-top:16px">
+    <div id="bankHealth"></div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
     <h3 style="margin-top:0">Module visibility</h3>
     <div class="mini" style="margin-bottom:12px">Hide a module from students without deleting its questions. Hidden modules remain visible to administrators.</div>
     <div id="adminModuleVisibility"></div>
@@ -1337,6 +1398,7 @@ function renderImport(){
   document.getElementById('app').innerHTML=layout('Admin · Question Bank','Upload, update, add, and remove questions for all students.',body);
   renderAdminQuestionList();
   renderModuleVisibility();
+  renderBankHealth();
   loadAdminNotifications();
 }
 
@@ -1545,11 +1607,15 @@ function showImportPreview(data){
   const existingIds=new Set(bank.map(q=>q.id));
   const updates=normalized.filter(q=>existingIds.has(q.id)).length;
   const additions=normalized.length-updates;
+  const duplicateContent=normalized.map(q=>({q,dup:findQuestionDuplicate(q,bank)})).filter(x=>x.dup);
+  const warningHtml=duplicateContent.length
+    ? `<div class="notice" style="margin-top:10px"><b>Duplicate-content warning:</b> ${duplicateContent.length} question${duplicateContent.length===1?'':'s'} closely match existing bank questions.<div class="mini" style="margin-top:6px">${esc(duplicateContent.slice(0,8).map(x=>`${x.q.id||'no id'} ↔ ${x.dup.question.id||'no id'} (${x.dup.type==='exact'?'exact':'very similar'})`).join('\n'))}${duplicateContent.length>8?'\n…':''}</div></div>`
+    : '';
   const errorHtml=allErrors.length
     ? `<div class="notice error"><b>Fix these problems before uploading:</b><div style="white-space:pre-wrap;margin-top:6px">${esc(allErrors.slice(0,30).join('\n'))}</div>${allErrors.length>30?`<div class="mini" style="margin-top:6px">Showing the first 30 errors.</div>`:''}</div>`
     : '<div class="notice ok"><b>Validation passed.</b> The questions are ready to upload.</div>';
   const cards=normalized.slice(0,20).map((q,i)=>`<div class="category-card"><div class="category-head"><div><b>${esc(q.id||`Question ${i+1}`)}</b><div class="mini">${esc(q.module)} · ${esc(q.subject)} · ${esc(q.lecture)}</div></div><span class="pill">Correct: ${String.fromCharCode(65+(Number(q.correctIndex)||0))}</span></div><div style="margin-top:7px">${esc(q.question)}</div><div class="mini" style="margin-top:6px">A. ${esc(q.options?.[0]||'')} · B. ${esc(q.options?.[1]||'')} · C. ${esc(q.options?.[2]||'')} · D. ${esc(q.options?.[3]||'')}</div></div>`).join('');
-  preview.innerHTML=`<div class="category-head"><h3 style="margin:0">JSON Preview</h3><span class="pill">${normalized.length} question${normalized.length===1?'':'s'}</span></div><div class="mini" style="margin:8px 0 12px">${additions} new · ${updates} existing ID${updates===1?'':'s'} will be updated · ${allErrors.length} validation error${allErrors.length===1?'':'s'}</div>${errorHtml}<div class="mini" style="margin:14px 0 8px">Showing ${Math.min(20,normalized.length)} of ${normalized.length} questions.</div>${cards||'<div class="empty">The JSON array is empty.</div>'}${!allErrors.length&&normalized.length?`<div class="actions" style="margin-top:14px"><button class="btn primary" onclick="uploadPreviewToSupabase()">Upload ${normalized.length} to Supabase</button><button class="btn" onclick="addPreviewQuestions(pendingImportQuestions)">Add to this browser</button><button class="btn" onclick="replaceWithPreviewBank(pendingImportQuestions)">Use as browser preview</button></div>`:''}`;
+  preview.innerHTML=`<div class="category-head"><h3 style="margin:0">JSON Preview</h3><span class="pill">${normalized.length} question${normalized.length===1?'':'s'}</span></div><div class="mini" style="margin:8px 0 12px">${additions} new · ${updates} existing ID${updates===1?'':'s'} will be updated · ${allErrors.length} validation error${allErrors.length===1?'':'s'}</div>${errorHtml}${warningHtml}<div class="mini" style="margin:14px 0 8px">Showing ${Math.min(20,normalized.length)} of ${normalized.length} questions.</div>${cards||'<div class="empty">The JSON array is empty.</div>'}${!allErrors.length&&normalized.length?`<div class="actions" style="margin-top:14px"><button class="btn primary" onclick="uploadPreviewToSupabase()">Upload ${normalized.length} to Supabase</button><button class="btn" onclick="addPreviewQuestions(pendingImportQuestions)">Add to this browser</button><button class="btn" onclick="replaceWithPreviewBank(pendingImportQuestions)">Use as browser preview</button></div>`:''}`;
 }
 async function uploadPreviewToSupabase(){
   if(!(await requireAdmin())) return;
@@ -1675,30 +1741,19 @@ function ensureAIModelForProvider(){
 }
 ensureAIModelForProvider();
 
+let lastAIResponseMeta=null;
 async function callAI(contents, generationConfig){
-  let res, data;
+  let res,data;
   const headers={'Content-Type':'application/json'};
-  if(aiSettings.accessCode) headers['x-access-code']=aiSettings.accessCode;
+  if(aiSettings.accessCode)headers['x-access-code']=aiSettings.accessCode;
   try{
-    res=await fetch('/api/ai',{
-      method:'POST',
-      headers,
-      body:JSON.stringify({
-        provider:aiSettings.provider||'groq',
-        model:aiSettings.model,
-        contents,
-        generationConfig
-      })
-    });
-  }catch(e){
-    throw new Error('Could not reach the AI service. Check your connection.');
-  }
-  try{ data=await res.json(); }catch(e){ data=null; }
-  if(!res.ok){
-    throw new Error((data&&data.error)||`HTTP ${res.status} from the AI service.`);
-  }
+    res=await fetch('/api/ai',{method:'POST',headers,body:JSON.stringify({provider:aiSettings.provider||'groq',model:aiSettings.model,contents,generationConfig})});
+  }catch(e){const err=new Error('Could not reach the AI service. Check your connection.');err.code='NETWORK_ERROR';throw err;}
+  try{data=await res.json();}catch(e){data=null;}
+  lastAIResponseMeta={status:res.status,model:data?.model||aiSettings.model,provider:data?.provider||aiProviderLabel(aiSettings.provider),finishReason:data?.finishReason||null,requestId:data?.requestId||null};
+  if(!res.ok){const err=new Error((data&&data.error)||`HTTP ${res.status} from the AI service.`);err.status=res.status;err.meta=lastAIResponseMeta;throw err;}
   const text=data&&data.text;
-  if(!text) throw new Error(`${aiProviderLabel(aiSettings.provider)} returned an empty response.`);
+  if(!text){const finish=data?.finishReason?` Finish reason: ${data.finishReason}.`:'';const err=new Error(`${aiProviderLabel(aiSettings.provider)} returned an empty response.${finish}`);err.meta=lastAIResponseMeta;throw err;}
   return text;
 }
 
@@ -1926,6 +1981,63 @@ function aiQuestionPreviewCard(q){
     <div class="mini" style="margin-top:4px">${esc(q.module)} · ${esc(q.subject)} · ${esc(q.lecture)}</div>
   </div>`;
 }
+function validateGeneratedRaw(raw, existingQuestions, batchQuestions){
+  const candidate=normalizeQuestion({id:`temp-${Math.random().toString(36).slice(2)}`,module:document.getElementById('genModule')?.value||'General',subject:document.getElementById('genSubject')?.value||'General',lecture:document.getElementById('genLecture')?.value||'General',difficulty:raw?.difficulty||document.getElementById('genDifficulty')?.value||'Mixed',question:raw?.question,options:raw?.options,correctIndex:raw?.correctIndex,explanation:raw?.explanation},'AI generated');
+  const structural=validateQuestion(candidate,0,{requireExplanation:true});
+  if(structural)return structural;
+  const dup=findQuestionDuplicate(candidate,[...existingQuestions,...batchQuestions],0.92);
+  if(dup)return `Duplicate or near-duplicate of ${dup.question.id||'an existing question'} (${dup.type==='exact'?'exact match':'very similar'})`;
+  return '';
+}
+function buildAIPrompt({module,subject,lecture,difficulty,thinkingLevel,batchCount,sourceType,sourceBlock,repairNote=''}){
+  return `You are the medical question generator for Med64, a medical examination platform.
+Generate exactly ${batchCount} original multiple-choice questions for medical students.
+Module: ${module}
+Subject: ${subject}
+Lecture: ${lecture}
+Difficulty: ${difficulty}
+Thinking level: ${thinkingLevel}
+Question source: ${sourceType==='website'?'questions already in this website':'selected AI medical knowledge'}
+
+${sourceBlock}
+
+Rules:
+- Exactly 4 non-empty answer options and exactly one correct answer.
+- Be medically accurate and focused on the selected lecture.
+- Prefer clinical application, analysis, interpretation and best-next-step reasoning.
+- Use plausible distractors based on common misconceptions or relevant alternatives.
+- Do not copy or paraphrase source questions.
+- Avoid duplicate questions.
+- Explanation must clearly justify the correct answer in 1–2 sentences.
+- Return ONLY valid JSON with exactly this shape: {"questions":[{"question":"...","options":["A","B","C","D"],"correctIndex":0,"explanation":"...","difficulty":"${difficulty}"}]}
+- correctIndex is zero-based.
+- Return exactly ${batchCount} complete question objects.
+- Never stop in the middle of JSON.
+${repairNote?`
+IMPORTANT RETRY NOTE: ${repairNote}`:''}`;
+}
+async function requestAIBatchWithRetry(prompt,batchCount,existingQuestions){
+  const maxAttempts=3;let lastError=null;
+  for(let attempt=1;attempt<=maxAttempts;attempt++){
+    try{
+      const text=await callAI([{role:'user',parts:[{text:prompt}]}],{maxOutputTokens:aiSettings.provider==='openrouter'?2200:Math.min(16000,Math.max(5000,batchCount*700)),jsonMode:aiSettings.provider==='openrouter'});
+      const rawList=parseAIQuestionJSON(text);
+      if(rawList.length!==batchCount)throw new Error(`Expected ${batchCount} question${batchCount===1?'':'s'}, received ${rawList.length}.`);
+      const batch=[];let problem='';
+      for(const raw of rawList){const err=validateGeneratedRaw(raw,existingQuestions,batch);if(err){problem=err;break;}batch.push(raw);}
+      if(problem)throw new Error(problem);
+      return batch;
+    }catch(e){
+      lastError=e;
+      if(attempt<maxAttempts){
+        await new Promise(r=>setTimeout(r,700*attempt));
+        prompt=prompt.replace(/\nIMPORTANT RETRY NOTE:[\s\S]*$/,'')+`\nIMPORTANT RETRY NOTE: Attempt ${attempt+1}. Previous output was rejected because: ${e.message}. Return only complete JSON and fix that problem.`;
+      }
+    }
+  }
+  const meta=lastAIResponseMeta?` [${lastAIResponseMeta.provider} · ${lastAIResponseMeta.model}${lastAIResponseMeta.finishReason?` · finish=${lastAIResponseMeta.finishReason}`:''}${lastAIResponseMeta.status?` · HTTP ${lastAIResponseMeta.status}`:''}]`:'';
+  throw new Error(`${lastError?.message||'AI generation failed.'}${meta}`);
+}
 async function generateAIQuestions(){
   if(aiBusy) return;
   const module=document.getElementById('genModule').value.trim();
@@ -1973,42 +2085,8 @@ ${JSON.stringify(sourceQuestions)}`;
       const batchCount=batches[bi];
       if(resultBox) resultBox.innerHTML=`<div class="card" style="margin-top:14px"><div class="mini">Generating batch ${bi+1} of ${batches.length} (${allRaw.length}/${count} questions completed) with ${esc(aiProviderLabel(aiSettings.provider))}…</div></div>`;
 
-      const prompt=`You are the medical question generator for Med64, a medical examination platform.
-Generate exactly ${batchCount} original multiple-choice questions for medical students.
-Module: ${module}
-Subject: ${subject}
-Lecture: ${lecture}
-Difficulty: ${difficulty}
-Thinking level: ${thinkingLevel}
-Question source: ${sourceType==='website'?'questions already in this website':'selected AI medical knowledge'}
-
-${sourceBlock}
-
-Rules:
-- Each question must have exactly 4 answer options and exactly one correct answer.
-- The questions must be clinically and medically accurate.
-- Prioritize higher-order thinking (Bloom-style Apply, Analyze, and Evaluate): use clinical vignettes, interpretation of signs/labs/images or mechanisms, comparison of related concepts, prediction of outcomes, and best-next-step reasoning when appropriate.
-- Do NOT make questions that can be answered by simple definition/recall unless a small amount of recall is necessary to support a higher-order decision.
-- Make distractors plausible and based on common misconceptions or clinically relevant alternatives.
-- Avoid duplicate questions and avoid copying source wording.
-- Keep the questions focused on the selected lecture.
-- Return ONLY a valid JSON object. No markdown fences, no commentary, and no text before or after the object.
-- The object must have exactly this top-level shape: {\"questions\":[...]}
-- Each item must have exactly this shape:
-{"question":"...","options":["A","B","C","D"],"correctIndex":0,"explanation":"Brief justification.","difficulty":"${difficulty}"}
-- correctIndex is zero-based.
-- Keep each question concise and each explanation to 1–2 sentences.
-- For this batch, return exactly ${batchCount} complete objects inside the questions array.
-- Do not stop in the middle of an object. Return the complete JSON object.`;
-
-      const text=await callAI([{role:'user',parts:[{text:prompt}]}],{
-        maxOutputTokens: aiSettings.provider==='openrouter'
-          ? 2200
-          : Math.min(16000, Math.max(5000, batchCount*700)),
-        jsonMode: aiSettings.provider==='openrouter'
-      });
-      const rawList=parseAIQuestionJSON(text);
-      if(!rawList.length) throw new Error(`Batch ${bi+1} returned no questions.`);
+      const prompt=buildAIPrompt({module,subject,lecture,difficulty,thinkingLevel,batchCount,sourceType,sourceBlock});
+      const rawList=await requestAIBatchWithRetry(prompt,batchCount,allQuestionBank);
       allRaw.push(...rawList.slice(0,batchCount));
       if(rawList.length<batchCount) throw new Error(`${aiProviderLabel(aiSettings.provider)} returned only ${rawList.length} of ${batchCount} questions in batch ${bi+1}. Please try again.`);
     }
@@ -2037,7 +2115,8 @@ Rules:
     <div class="actions" style="margin-top:12px"><button class="btn primary" onclick="go('aiquestions')">Review in AI Questions</button></div></div>`;
     toast(`Generated ${stamped.length} questions with ${aiProviderLabel(aiSettings.provider)}.`,'ok');
   }catch(e){
-    if(resultBox) resultBox.innerHTML=`<div class="card" style="margin-top:14px"><div class="notice error">Generation failed: ${esc(e.message)}</div></div>`;
+    const diagnostic=lastAIResponseMeta?`<div class="mini" style="margin-top:8px">Provider: ${esc(lastAIResponseMeta.provider||aiProviderLabel(aiSettings.provider))} · Model: ${esc(lastAIResponseMeta.model||aiSettings.model)}${lastAIResponseMeta.finishReason?` · Finish: ${esc(lastAIResponseMeta.finishReason)}`:''}${lastAIResponseMeta.status?` · HTTP ${esc(lastAIResponseMeta.status)}`:''}</div>`:'';
+    if(resultBox) resultBox.innerHTML=`<div class="card" style="margin-top:14px"><div class="notice error"><b>Generation failed</b><div style="margin-top:6px">${esc(e.message)}</div>${diagnostic}<div class="actions" style="margin-top:12px"><button class="btn primary" onclick="generateAIQuestions()">Retry generation</button><button class="btn" onclick="go('ai')">Change AI provider</button></div></div></div>`;
     toast(`${aiProviderLabel(aiSettings.provider)} generation failed: `+e.message,'error');
   }finally{
     aiBusy=false;
