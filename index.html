@@ -92,12 +92,6 @@ h1,h2,h3{font-family:var(--font-serif);font-weight:600;letter-spacing:-.01em;mar
   .scrim{display:none}
 }
 
-/* ---------- PWA / Phase 5 ---------- */
-.install-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}
-.streak-card{background:linear-gradient(135deg,var(--primary-soft),var(--card))}
-.qotd-card{border-left:4px solid var(--primary)}
-.report-btn{font-size:12px}
-.admin-kpi{min-height:118px}
 /* ---------- Page header ---------- */
 .top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:22px;flex-wrap:wrap}
 .top h1{font-size:26px}
@@ -238,16 +232,14 @@ h1,h2,h3{font-family:var(--font-serif);font-weight:600;letter-spacing:-.01em;mar
       <button data-view="exam"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="12" height="15" rx="2"/><rect x="7" y="1.3" width="6" height="3" rx="1"/><line x1="7" y1="9" x2="13" y2="9"/><line x1="7" y1="12.4" x2="13" y2="12.4"/><line x1="7" y1="15.8" x2="10.5" y2="15.8"/></svg><span>Start Exam</span></button>
       <button data-view="progress"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="2.5,15 7,9.5 10.5,12.5 17.5,4"/><polyline points="12.5,4 17.5,4 17.5,9"/></svg><span>Progress & Accuracy</span></button>
       <button data-view="history"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10.5" r="7.5"/><polyline points="10,6 10,10.5 13.2,12.6"/><polyline points="3.5,2 3.5,5 6.5,5"/></svg><span>Exam History</span></button>
+      <button data-view="analytics"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="17" x2="4" y2="9"/><line x1="10" y1="17" x2="10" y2="4"/><line x1="16" y1="17" x2="16" y2="7"/><line x1="2.5" y1="17" x2="17.5" y2="17"/></svg><span>Analytics</span></button>
       <button data-view="mistakes"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.5"/><line x1="7.3" y1="7.3" x2="12.7" y2="12.7"/><line x1="12.7" y1="7.3" x2="7.3" y2="12.7"/></svg><span>Mistakes</span></button>
       <button data-view="weak"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,14 7,10 10,12 17,5"/><polyline points="13,5 17,5 17,9"/></svg><span>Weak Topics</span></button>
       <button data-view="favorites"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linejoin="round"><path d="M10 16.8 3.6 10.4A4.1 4.1 0 0 1 9.4 4.6L10 5.2l.6-.6a4.1 4.1 0 0 1 5.8 5.8L10 16.8Z"/></svg><span>Favorites</span></button>
       <button data-view="bank" id="bankNav"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polygon points="10,2 18,6.5 10,11 2,6.5"/><polyline points="2,10.5 10,15 18,10.5"/><polyline points="2,14.5 10,19 18,14.5"/></svg><span>Question Bank</span></button>
       <button data-view="import" id="adminNav" style="display:none"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13V2.5"/><polyline points="6,6.5 10,2.5 14,6.5"/><path d="M3 13v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg><span>Upload / Update Questions</span></button>
       <button data-view="ai"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2.5 L11.6 7.2 L16.2 8.8 L11.6 10.4 L10 15.1 L8.4 10.4 L3.8 8.8 L8.4 7.2 Z"/><path d="M16 2.5 L16.7 4.4 L18.6 5.1 L16.7 5.8 L16 7.7 L15.3 5.8 L13.4 5.1 L15.3 4.4 Z"/></svg><span>AI Assistant</span></button>
-      <button data-view="streak"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 18c4 0 6-2.5 6-5.5 0-2.3-1.3-4-3.1-5.5.1 2-1.1 3.1-2.5 3.1-.8-2.5-1.7-4.7-.2-7.6C6.5 4.3 5 7.2 5 10c0 1.6.7 2.9 1.9 3.9-.1-1.4.5-2.4 1.6-3.1.2 2.2-.1 3.8-1.1 5.1.7 1.3 1.8 2.1 2.6 2.1Z"/></svg><span>Study Streak</span></button>
-      <button data-view="qotd"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.5"/><path d="M10 6v4l2.8 1.7"/></svg><span>Question of the Day</span></button>
       <button data-view="aiquestions"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="14" height="4" rx="1.2"/><rect x="3" y="8.5" width="14" height="4" rx="1.2"/><rect x="3" y="14" width="14" height="4" rx="1.2"/><circle cx="6" cy="5" r=".6" fill="currentColor"/><circle cx="6" cy="10.5" r=".6" fill="currentColor"/><circle cx="6" cy="16" r=".6" fill="currentColor"/></svg><span>AI Questions</span></button>
-      <button data-view="adminanalytics" id="adminAnalyticsNav" style="display:none"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="17" x2="3" y2="10"/><line x1="8.5" y1="17" x2="8.5" y2="5"/><line x1="14" y1="17" x2="14" y2="8"/><line x1="19" y1="17" x2="19" y2="3"/></svg><span>Admin Analytics</span></button>
       <button data-view="settings"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round"><line x1="2" y1="5" x2="18" y2="5"/><circle cx="13" cy="5" r="2"/><line x1="2" y1="10" x2="18" y2="10"/><circle cx="7" cy="10" r="2"/><line x1="2" y1="15" x2="18" y2="15"/><circle cx="14" cy="15" r="2"/></svg><span>Settings</span></button>
       <button data-view="account"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="6.5" r="3.2"/><path d="M4 17c.8-3.2 2.8-4.8 6-4.8s5.2 1.6 6 4.8"/></svg><span>Account</span></button>
     </div>
@@ -277,27 +269,14 @@ h1,h2,h3{font-family:var(--font-serif);font-weight:600;letter-spacing:-.01em;mar
 
 const SUPABASE_URL = 'https://ywveooexkhmmmxwtmxxl.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_mkYMEw2AdqmBnHceGfo6cw_LAIcaIls';
-const SUPABASE_ENABLED = !!(
+const SUPABASE_ENABLED =
   window.supabase &&
-  SUPABASE_URL &&
-  SUPABASE_PUBLISHABLE_KEY &&
   !SUPABASE_URL.includes('PASTE_YOUR_') &&
-  !SUPABASE_PUBLISHABLE_KEY.includes('PASTE_YOUR_')
-);
+  !SUPABASE_PUBLISHABLE_KEY.includes('PASTE_YOUR_');
 
-let supabaseClient = null;
-let SUPABASE_RUNTIME_ERROR = '';
-if (SUPABASE_ENABLED) {
-  try {
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
-    });
-  } catch (e) {
-    SUPABASE_RUNTIME_ERROR = e?.message || String(e);
-    console.warn('Supabase initialization failed:', SUPABASE_RUNTIME_ERROR);
-    supabaseClient = null;
-  }
-}
+const supabaseClient = SUPABASE_ENABLED
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY)
+  : null;
 let isAdmin=false;
 let adminCheckLoaded=false;
 
@@ -355,7 +334,7 @@ let activeNotifications = [];
 async function checkAdminRole(){
   isAdmin=false;
   adminCheckLoaded=true;
-  if(!supabaseClient || !currentUser) return false;
+  if(!SUPABASE_ENABLED || !currentUser) return false;
   try{
     const {data,error}=await supabaseClient.rpc('is_admin');
     if(!error) isAdmin=!!data;
@@ -369,7 +348,7 @@ async function requireAdmin(){
   return true;
 }
 async function refreshAuthUser(){
-  if(!supabaseClient){ currentUser=null; return; }
+  if(!SUPABASE_ENABLED){ currentUser=null; return; }
   try{
     const {data,error}=await supabaseClient.auth.getUser();
     if(error) throw error;
@@ -378,7 +357,7 @@ async function refreshAuthUser(){
 }
 
 async function signUpStudent(email,password){
-  if(!supabaseClient){toast('Supabase is not connected.','error');return false;}
+  if(!SUPABASE_ENABLED){toast('Supabase is not connected.','error');return false;}
   email=(email||'').trim().toLowerCase();
   if(!email || !password){toast('Enter an email and password.','error');return false;}
   if(password.length<6){toast('Password must be at least 6 characters.','error');return false;}
@@ -390,7 +369,7 @@ async function signUpStudent(email,password){
 }
 
 async function signInStudent(email,password){
-  if(!supabaseClient){toast('Supabase is not connected.','error');return false;}
+  if(!SUPABASE_ENABLED){toast('Supabase is not connected.','error');return false;}
   email=(email||'').trim().toLowerCase();
   const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
   if(error){toast(error.message,'error');return false;}
@@ -401,7 +380,7 @@ async function signInStudent(email,password){
 }
 
 async function signOutStudent(){
-  if(supabaseClient){const {error}=await supabaseClient.auth.signOut();if(error)console.warn(error.message);}
+  if(SUPABASE_ENABLED){const {error}=await supabaseClient.auth.signOut();if(error)console.warn(error.message);}
   currentUser=null; progress=loadJSON(CONFIG.progressKey,{}); remoteHistory=[]; globalAnalytics={modules:[],lectures:[],students:0,submittedExams:0,averageScore:0};
   render(); toast('Signed out.','ok');
 }
@@ -421,7 +400,7 @@ async function afterAuthChanged(){
 }
 
 async function syncLocalProgressToSupabase(){
-  if(!supabaseClient || !currentUser)return;
+  if(!SUPABASE_ENABLED || !currentUser)return;
   const rows=[];
   for(const q of bank){
     const p=progress[key(q)];
@@ -443,7 +422,7 @@ async function syncLocalProgressToSupabase(){
 }
 
 async function loadSupabaseProgress(){
-  if(!supabaseClient || !currentUser)return;
+  if(!SUPABASE_ENABLED || !currentUser)return;
   const {data,error}=await supabaseClient
     .from('student_question_progress')
     .select('question_id,attempts,correct_count,wrong_count,last_result')
@@ -463,7 +442,7 @@ async function loadSupabaseProgress(){
 }
 
 async function recordAttemptToSupabase(q, selectedIndex, isCorrect, examId){
-  if(!supabaseClient || !currentUser)return;
+  if(!SUPABASE_ENABLED || !currentUser)return;
   const {error}=await supabaseClient.from('question_attempts').insert({
     user_id:currentUser.id,
     exam_id:examId,
@@ -478,7 +457,7 @@ async function recordAttemptToSupabase(q, selectedIndex, isCorrect, examId){
 }
 
 async function saveExamToSupabase(result){
-  if(!supabaseClient || !currentUser)return;
+  if(!SUPABASE_ENABLED || !currentUser)return;
   const {error}=await supabaseClient.from('exams').insert({
     id:result.id,
     user_id:currentUser.id,
@@ -501,7 +480,7 @@ async function saveExamToSupabase(result){
 
 async function loadSupabaseHistory(){
   remoteHistoryLoaded=false;
-  if(!supabaseClient || !currentUser)return;
+  if(!SUPABASE_ENABLED || !currentUser)return;
   const {data,error}=await supabaseClient.from('exams').select('*').eq('user_id',currentUser.id).order('finished_at',{ascending:false});
   if(error){console.warn('Exam history load failed:',error.message);return;}
   remoteHistory=(data||[]).map(e=>({
@@ -513,7 +492,7 @@ async function loadSupabaseHistory(){
 }
 
 async function loadGlobalAnalytics(){
-  if(!supabaseClient)return;
+  if(!SUPABASE_ENABLED)return;
   try{
     const {data,error}=await supabaseClient.rpc('get_global_analytics');
     if(error)throw error;
@@ -536,7 +515,7 @@ function globalLectureStats(module,subject,lecture){
 function isModuleVisible(module){ return isAdmin || moduleVisibility[String(module||'').trim()] !== true; }
 async function loadModuleVisibility(){
   moduleVisibility={};
-  if(!supabaseClient)return;
+  if(!SUPABASE_ENABLED)return;
   try{
     const {data,error}=await supabaseClient.from('module_visibility').select('module,hidden');
     if(error)throw error;
@@ -642,7 +621,7 @@ async function fetchJSON(url){
   return await r.json();
 }
 async function loadQuestionsFromSupabase(){
-  if(!supabaseClient)return false;
+  if(!SUPABASE_ENABLED)return false;
   try{
     // Supabase/PostgREST commonly caps a single request at 1,000 rows.
     // Fetch the table in pages so MedEx can load 1,001+ questions too.
@@ -783,17 +762,17 @@ function layout(title,subtitle,body,actions=''){
 function render(){
   updateSidebarFoot();
   const view=location.hash.replace('#','')||'dashboard';
-  const allowed=['dashboard','exam','progress','history','mistakes','weak','favorites','bank','import','ai','aiquestions','streak','qotd','adminanalytics','settings','account','results'];
+  const allowed=['dashboard','exam','progress','history','analytics','mistakes','weak','favorites','bank','import','ai','aiquestions','settings','account','results'];
   const v=allowed.includes(view)?view:'dashboard';
   document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
   const adminNav=document.getElementById('adminNav'); if(adminNav) adminNav.style.display=isAdmin?'flex':'none';
-  const adminAnalyticsNav=document.getElementById('adminAnalyticsNav'); if(adminAnalyticsNav) adminAnalyticsNav.style.display=isAdmin?'flex':'none';
   const bankNav=document.getElementById('bankNav'); if(bankNav) bankNav.style.display=isAdmin?'flex':'none';
   if(v==='bank' && !isAdmin){ location.hash='dashboard'; return; }
   if(v==='dashboard') renderDashboard();
   else if(v==='exam') renderExamSetup();
   else if(v==='progress') renderProgress();
   else if(v==='history') renderHistory();
+  else if(v==='analytics') renderAnalytics();
   else if(v==='mistakes') renderMistakes();
   else if(v==='weak') renderWeakTopics();
   else if(v==='favorites') renderFavorites();
@@ -801,9 +780,6 @@ function render(){
   else if(v==='import') renderImport();
   else if(v==='ai') renderAIAssistant();
   else if(v==='aiquestions') renderAIQuestions();
-  else if(v==='streak') renderStudyStreak();
-  else if(v==='qotd') renderQuestionOfDay();
-  else if(v==='adminanalytics') { if(isAdmin) renderAdminAnalytics(); else go('dashboard'); }
   else if(v==='settings') renderSettings();
   else if(v==='account') renderAccount();
   else renderResults();
@@ -832,13 +808,8 @@ function updateSidebarFoot(){
 function renderDashboard(){
   const modules=getModules();
   const noticeHtml=(activeNotifications||[]).length ? activeNotifications.map(n=>`<div class="card" style="margin-bottom:16px;border-left:4px solid var(--primary)"><div class="category-head"><strong>${esc(n.title||'Announcement')}</strong><span class="mini">${n.created_at?new Date(n.created_at).toLocaleString():''}</span></div><div style="margin-top:8px;white-space:pre-wrap">${esc(n.message||'')}</div></div>`).join('') : '';
-  const streak=studyStreakData();
-  const qotd=getQuestionOfDay();
-  const installHtml=window.deferredInstallPrompt?`<div class="card install-banner"><div><strong>Install MedEx</strong><div class="mini">Add MedEx to your home screen for a faster app-like experience.</div></div><button class="btn primary" onclick="installPWA()">Install app</button></div>`:'';
   const body=`
-  ${installHtml}
   ${noticeHtml}
-  <div class="grid two" style="margin-bottom:16px"><div class="card streak-card"><div class="category-head"><strong>🔥 Study streak</strong><span class="pill">${streak.current} day${streak.current===1?'':'s'}</span></div><div class="value" style="margin-top:8px;font-size:28px">${streak.current}</div><div class="mini">Current streak · Best ${streak.best} days · ${streak.today?'Studied today':'Study today to keep it going'}</div></div><div class="card qotd-card"><div class="category-head"><strong>Question of the Day</strong><span class="pill">${esc(qotd.subject||'Medical')}</span></div><div style="margin-top:8px">${esc(qotd.question)}</div><div class="actions" style="margin-top:10px"><button class="btn primary" onclick="go('qotd')">Open question</button></div></div></div>
   <div class="grid stats">
     <div class="card stat"><div class="label">Questions available</div><div class="value">${bank.length}</div></div>
     <div class="card stat"><div class="label">Questions practiced</div><div class="value">${practicedCount(bank)}</div></div>
@@ -1112,7 +1083,6 @@ function renderQuiz(){
     </div>
     <div class="question">${esc(q.question)}</div>
     <div class="options">${opts}</div>
-    <div class="actions" style="margin-top:12px"><button class="btn report-btn" onclick="reportQuestion('${attrJs(q.id)}')">⚑ Report this question</button></div>
     <div class="quiz-footer"><button class="btn" onclick="reviewExam()">Review Exam</button><button class="btn" onclick="prevQ()" ${exam.index===0?'disabled':''}>Previous</button>
     <button class="btn primary" onclick="${exam.index===exam.list.length-1?'submitExam(false)':'nextQ()'}">${exam.index===exam.list.length-1?'Submit Exam':'Next'}</button></div>
   </div></div>`;
@@ -1160,7 +1130,6 @@ async function submitExam(auto){
   if(!exam)return;
   if(!auto && !confirm('Submit this exam now?'))return;
   clearInterval(timerId);
-  markStudyDay();
   let correct=0;
   exam.list.forEach(q=>{
     const a=exam.answers[q.id];
@@ -1193,7 +1162,7 @@ async function submitExam(auto){
     blueprint:exam.blueprint||null
   };
 
-  if(supabaseClient && currentUser){
+  if(SUPABASE_ENABLED && currentUser){
     await saveExamToSupabase(result);
     for(const q of exam.list){
       const a=exam.answers[q.id];
@@ -1247,7 +1216,7 @@ function renderHistory(){
 }
 
 function renderAccount(){
-  if(!SUPABASE_ENABLED){document.getElementById('app').innerHTML=layout('Account','Supabase connection is required.',`<div class="card"><div class="notice error">Supabase is not connected.${SUPABASE_RUNTIME_ERROR?`<br><span class="mini">${esc(SUPABASE_RUNTIME_ERROR)}</span>`:''}</div></div>`);return;}
+  if(!SUPABASE_ENABLED){document.getElementById('app').innerHTML=layout('Account','Supabase connection is required.',`<div class="card"><div class="notice error">Supabase is not connected.</div></div>`);return;}
   if(currentUser){
     const body=`<div class="card"><h2>Account</h2><div class="mini" style="margin-top:8px">${esc(currentUser.email||'')}</div><div class="actions" style="margin-top:16px"><button class="btn danger" onclick="signOutStudent()">Sign out</button></div></div><div class="card" style="margin-top:16px"><strong>Your data is cloud-synced</strong><p class="mini">Exam history, question progress and aggregate analytics are tied to your Supabase account, so they can be loaded on another device after signing in.</p></div>`;
     document.getElementById('app').innerHTML=layout('Account','Your student account.',body); return;
@@ -1282,7 +1251,7 @@ function renderResults(){
   const rows=r.list.map((q,i)=>{
     const a=r.answers[q.id], ok=a===q.correctIndex;
     const choices=q.options.map((o,j)=>{let cls='review-choice';if(j===q.correctIndex)cls+=' correct';if(j===a&&j!==q.correctIndex)cls+=' wrong';if(j===a)cls+=' selected';const tag=j===q.correctIndex?' — Correct answer':j===a?' — Your answer':'';return `<div class="${cls}"><b>${String.fromCharCode(65+j)}.</b> ${esc(o)}<span class="mini">${tag}</span></div>`;}).join('');
-    return `<div class="category-card" style="margin-bottom:14px"><div class="category-head"><b>${i+1}. ${esc(q.question)}</b><button class="btn report-btn" onclick="reportQuestion('${attrJs(q.id)}')">⚑ Report</button></div><div class="mini" style="margin-top:6px">${esc(q.module)} · ${esc(q.subject)} · ${esc(q.lecture)} · ${esc(difficultyOf(q))}</div><div style="margin-top:12px">${choices}</div><div class="review ${a===undefined?'bad':ok?'good':'bad'}">${a===undefined?'Unanswered':ok?'Correct':'Incorrect'} · Your answer: ${a===undefined?'—':esc(q.options[a])}<br>Correct answer: <b>${esc(q.options[q.correctIndex])}</b>${q.explanation?`<br>${esc(q.explanation)}`:''}</div></div>`;
+    return `<div class="category-card" style="margin-bottom:14px"><div><b>${i+1}. ${esc(q.question)}</b></div><div class="mini" style="margin-top:6px">${esc(q.module)} · ${esc(q.subject)} · ${esc(q.lecture)} · ${esc(difficultyOf(q))}</div><div style="margin-top:12px">${choices}</div><div class="review ${a===undefined?'bad':ok?'good':'bad'}">${a===undefined?'Unanswered':ok?'Correct':'Incorrect'} · Your answer: ${a===undefined?'—':esc(q.options[a])}<br>Correct answer: <b>${esc(q.options[q.correctIndex])}</b>${q.explanation?`<br>${esc(q.explanation)}`:''}</div></div>`;
   }).join('');
   const blueprint=r.blueprint?`${esc(r.blueprint.module||'All modules')} · ${esc(r.blueprint.subject||'All subjects')} · ${esc(r.blueprint.lecture||'All lectures')}${r.blueprint.difficulty?' · '+esc(r.blueprint.difficulty):''}`:'Not specified';
   const meta=`<div class="mini">${esc(r.label||'Exam')} · ${r.date?new Date(r.date).toLocaleString():''}${r.durationSec?' · '+formatTime(r.durationSec)+' taken':''}</div>`;
@@ -1291,6 +1260,53 @@ function renderResults(){
   <div class="grid two" style="margin-top:16px"><div class="card"><h2 class="section-title">By subject</h2>${analysis(bySubject)}</div><div class="card"><h2 class="section-title">By difficulty</h2>${analysis(byDifficulty)}</div></div>
   <h2 class="section-title">Review Exam</h2><div>${rows}</div><div class="actions" style="margin-top:14px"><button class="btn primary" onclick="go('exam')">New Exam</button><button class="btn" onclick="go('history')">Exam History</button><button class="btn" onclick="go('progress')">View Progress</button></div>`;
   document.getElementById('app').innerHTML=layout('Exam Results',r.auto?'Time expired — exam submitted automatically.':'Exam completed.',body);
+}
+
+function renderAnalytics(){
+  const hist=loadJSON(CONFIG.historyKey,[]);
+  const totalExams=hist.length;
+  const answered=hist.reduce((n,e)=>n+Number(e.answered||0),0);
+  const correct=hist.reduce((n,e)=>n+Number(e.correct||0),0);
+  const wrong=Math.max(0,answered-correct);
+  const accuracy=answered?Math.round(correct/answered*100):0;
+  const avgScore=totalExams?Math.round(hist.reduce((n,e)=>n+Number(e.accuracy||0),0)/totalExams):0;
+  const totalTime=hist.reduce((n,e)=>n+Number(e.durationSec||0),0);
+  const activeDays=new Set(hist.map(e=>String(e.date||'').slice(0,10)).filter(Boolean)).size;
+  const moduleStats={};
+  hist.forEach(e=>{
+    (e.list||[]).forEach(q=>{
+      const a=e.answers?.[q.id];
+      if(a===undefined)return;
+      const m=q.module||'Unspecified';
+      if(!moduleStats[m])moduleStats[m]={answered:0,correct:0};
+      moduleStats[m].answered++;
+      if(a===q.correctIndex)moduleStats[m].correct++;
+    });
+  });
+  const moduleRows=Object.entries(moduleStats).sort((a,b)=>a[0].localeCompare(b[0])).map(([m,x])=>{
+    const pct=x.answered?Math.round(x.correct/x.answered*100):0;
+    return `<div class="progress-row" style="grid-template-columns:1fr 100px 90px"><span><b>${esc(m)}</b><div class="mini">${x.correct}/${x.answered} correct</div></span><div><div class="bar"><i style="width:${pct}%"></i></div></div><span class="pill">${pct}%</span></div>`;
+  }).join('')||'<div class="empty">Complete an exam to build your local analytics.</div>';
+  const recent=hist.slice(0,10).map(e=>`<tr><td>${esc(e.label||'Exam')}</td><td>${e.correct||0}/${e.total||0}</td><td>${Number(e.accuracy||0)}%</td><td>${e.date?new Date(e.date).toLocaleString():''}</td></tr>`).join('')||'<tr><td colspan="4">No submitted exams yet.</td></tr>';
+  const body=`
+    <div class="notice" style="margin-bottom:16px">${currentUser?'These figures include exams saved in this browser. Your signed-in cloud history remains available on the History page.':'You are not signed in. These analytics are stored only in this browser and do not require an account.'}</div>
+    <div class="grid stats">
+      <div class="card stat"><div class="label">Submitted exams</div><div class="value">${totalExams}</div></div>
+      <div class="card stat"><div class="label">Average exam score</div><div class="value">${avgScore}%</div></div>
+      <div class="card stat"><div class="label">Questions answered</div><div class="value">${answered}</div></div>
+      <div class="card stat"><div class="label">Accuracy</div><div class="value">${correct}/${answered}</div><div class="mini">${accuracy}% · ${wrong} wrong</div></div>
+    </div>
+    <div class="grid two" style="margin-top:16px">
+      <div class="card"><h3 style="margin-top:0">Study activity</h3><div class="progress-row" style="grid-template-columns:1fr 100px"><span>Active exam days</span><b>${activeDays}</b></div><div class="progress-row" style="grid-template-columns:1fr 100px"><span>Total study time</span><b>${formatTime(totalTime)}</b></div></div>
+      <div class="card"><h3 style="margin-top:0">Local storage</h3><p class="mini">Analytics use the same browser history already used for your exam results. Clearing site data will remove these anonymous analytics.</p><button class="btn" onclick="exportLocalAnalytics()">Export analytics</button></div>
+    </div>
+    <h2 class="section-title">Performance by module</h2><div class="card">${moduleRows}</div>
+    <h2 class="section-title">Recent local exams</h2><div class="card table-wrap"><table class="table"><thead><tr><th>Exam</th><th>Score</th><th>Accuracy</th><th>Date</th></tr></thead><tbody>${recent}</tbody></table></div>`;
+  document.getElementById('app').innerHTML=layout('Analytics','Personal analytics that work for signed-in and non-sign-in users.',body);
+}
+function exportLocalAnalytics(){
+  const hist=loadJSON(CONFIG.historyKey,[]);
+  downloadBlob(JSON.stringify({exportedAt:new Date().toISOString(),anonymous:!currentUser,history:hist,progress},null,2),'medex-local-analytics.json','application/json');
 }
 
 function renderProgress(){
@@ -1514,7 +1530,7 @@ function renderImport(){
 
 async function loadActiveNotifications(){
   activeNotifications=[];
-  if(!supabaseClient)return;
+  if(!SUPABASE_ENABLED)return;
   try{
     const {data,error}=await supabaseClient.from('site_notifications').select('id,title,message,created_at').eq('active',true).order('created_at',{ascending:false}).limit(5);
     if(error)throw error;
@@ -1582,8 +1598,6 @@ function renderAdminQuestionList(){
 async function deleteAdminQuestion(id){
   if(!(await requireAdmin()))return;
   if(!confirm(`Delete question "${id}" from the shared database? This cannot be undone.`))return;
-  const existing=allQuestionBank.find(q=>q.id===id);
-  await backupQuestionVersion(id,'delete',existing?{id:existing.id,module:existing.module,subject:existing.subject,lecture:existing.lecture,question:existing.question,options:existing.options,correct_index:existing.correctIndex,explanation:existing.explanation,difficulty:existing.difficulty,reference:existing.reference}:null);
   const {error}=await supabaseClient.rpc('admin_delete_question',{p_question_id:id});
   if(error){toast('Delete failed: '+error.message,'error');return;}
   allQuestionBank=allQuestionBank.filter(q=>q.id!==id);
@@ -1617,9 +1631,9 @@ async function addBuiltInQuestion(){
     toast('A question with this ID already exists. Use a unique ID.','error');return;
   }
 
-  q.source=supabaseClient && currentUser ? 'Supabase' : 'Built in';
+  q.source=SUPABASE_ENABLED && currentUser ? 'Supabase' : 'Built in';
 
-  if(supabaseClient && currentUser){
+  if(SUPABASE_ENABLED && currentUser){
     const {error}=await supabaseClient.from('questions').insert({
       id:q.id,module:q.module,subject:q.subject,lecture:q.lecture,
       question:q.question,options:q.options,correct_index:q.correctIndex,
@@ -1736,10 +1750,6 @@ async function uploadPreviewToSupabase(){
     question:q.question,options:q.options,correct_index:q.correctIndex,
     explanation:q.explanation||'',difficulty:q.difficulty||null,reference:q.reference||null
   }));
-  for(const q of pendingImportQuestions){
-    const existing=allQuestionBank.find(x=>x.id===q.id);
-    if(existing) await backupQuestionVersion(q.id,'update',{id:existing.id,module:existing.module,subject:existing.subject,lecture:existing.lecture,question:existing.question,options:existing.options,correct_index:existing.correctIndex,explanation:existing.explanation,difficulty:existing.difficulty,reference:existing.reference});
-  }
   const {error}=await supabaseClient.from('questions').upsert(rows,{onConflict:'id'});
   if(error){toast('Supabase upload failed: '+error.message,'error');return;}
   await loadQuestionsFromSupabase();
@@ -1837,36 +1847,7 @@ async function callMultiAgent(payload){
     res=await fetch('/api/multi-agent',{method:'POST',headers,body:JSON.stringify(payload)});
   }catch(e){ throw new Error('Could not reach the multi-agent AI service. Check your connection.'); }
   try{data=await res.json();}catch(e){data=null;}
-  if(!res.ok) {
-    // Older deployments may only have /api/gemini. Fall back automatically.
-    if (res.status === 404) {
-      const prompt = `Generate exactly ${payload.count || 5} original multiple-choice medical questions.
-Module: ${payload.module}
-Subject: ${payload.subject}
-Lecture: ${payload.lecture}
-Difficulty: ${payload.difficulty || 'Mixed'}
-Thinking level: ${payload.thinkingLevel || 'Higher-order thinking'}
-Source: ${payload.sourceType === 'website' ? 'Use the supplied website questions as source material without copying them.' : 'Use accurate medical knowledge.'}
-Return ONLY a JSON array. Each item must contain question, options (exactly 4), correctIndex (0-3), explanation, and difficulty.`;
-      let fallbackRes, fallbackData;
-      try {
-        fallbackRes = await fetch('/api/gemini', {
-          method:'POST', headers, body:JSON.stringify({
-            contents:[{role:'user',parts:[{text:prompt + (payload.sourceQuestions ? `\nWebsite questions:\n${JSON.stringify(payload.sourceQuestions.slice(0,80))}` : '')}]}],
-            generationConfig:{maxOutputTokens:8192,responseMimeType:'application/json'},
-            model:aiSettings.model||undefined
-          })
-        });
-        try { fallbackData = await fallbackRes.json(); } catch(e) { fallbackData=null; }
-      } catch(e) {
-        throw new Error('Could not reach either AI endpoint. Make sure your Vercel /api/gemini function is deployed.');
-      }
-      if(!fallbackRes.ok) throw new Error((fallbackData&&fallbackData.error)||`HTTP ${fallbackRes.status} from the AI service.`);
-      if(!fallbackData||!fallbackData.text) throw new Error('The Gemini service returned an empty response.');
-      return {text:fallbackData.text,agents:'Gemini fallback'};
-    }
-    throw new Error((data&&data.error)||`HTTP ${res.status} from the AI service.`);
-  }
+  if(!res.ok) throw new Error((data&&data.error)||`HTTP ${res.status} from the AI service.`);
   if(!data||!data.text) throw new Error('The multi-agent service returned an empty response.');
   return data;
 }
@@ -1887,7 +1868,7 @@ async function callGemini(contents,generationConfig){
 function renderAIAssistant(){
   const body=`
   <div class="card">
-    <div class="category-head"><strong>Gemini AI</strong><span class="ai-badge">✦ Gemini 3.8 Flash</span></div>
+    <div class="category-head"><strong>Gemini AI</strong><span class="ai-badge">✦ Gemini 3.6</span></div>
     <p class="mini" style="margin:8px 0 0">Question generation uses multiple independent medical AI agents plus a final critic/validator. API keys stay server-side and are never sent to the browser.</p>
     <details style="margin-top:10px">
       <summary class="mini" style="cursor:pointer;color:var(--primary2);font-weight:700">Advanced settings</summary>
@@ -2104,7 +2085,7 @@ async function generateAIQuestions(){
   if(resultBox) resultBox.innerHTML='<div class="card" style="margin-top:14px"><div class="mini">Running independent medical agents and a final validator…</div></div>';
 
   let sourceBlock='';
-  let reference='Gemini 3.8 Flash medical knowledge';
+  let reference='Gemini 3.6 Flash medical knowledge';
   if(sourceType==='website'){
     // Keep the source compact enough for high-volume generation while preserving
     // the actual wording, options, correct answer and explanation from the site.
@@ -2146,8 +2127,9 @@ Rules:
 - explanation should briefly justify the correct answer.`;
 
   try{
-    const agentResult=await callMultiAgent({module,subject,lecture,difficulty,thinkingLevel,count,sourceType,sourceQuestions:sourcePool.slice(0,80).map(q=>({question:q.question,options:q.options,correctAnswer:q.options[q.correctIndex],explanation:q.explanation}))});
-    const rawList=parseAIQuestionJSON(agentResult.text);
+    const websiteQuestions=sourcePool.slice(0,80).map(q=>({question:q.question,options:q.options,correctAnswer:q.options[q.correctIndex],explanation:q.explanation}));
+    const agentResultText=await callGemini([{role:'user',parts:[{text:prompt}]}],{maxOutputTokens:8192,responseMimeType:'application/json'});
+    const rawList=parseAIQuestionJSON(agentResultText);
     if(!rawList.length) throw new Error('No questions were returned. Try again or adjust your selections.');
 
     const stamped=rawList.slice(0,count).map((raw,i)=>normalizeQuestion({
@@ -2175,7 +2157,7 @@ Rules:
     <div class="mini" style="margin-top:8px">${esc(module+' AI generated')} · ${esc(subject)} · ${esc(lecture)}</div>
     <div style="margin-top:12px">${unique.map(q=>aiQuestionPreviewCard(q)).join('')}</div>
     <div class="actions" style="margin-top:12px"><button class="btn primary" onclick="go('aiquestions')">Review in AI Questions</button></div></div>`;
-    toast(`Generated ${unique.length} questions using ${agentResult.agents||'multiple AI agents'}.`,'ok');
+    toast(`Generated ${unique.length} questions with Gemini.`,'ok');
   }catch(e){
     if(resultBox) resultBox.innerHTML=`<div class="card" style="margin-top:14px"><div class="notice error">Generation failed: ${esc(e.message)}</div></div>`;
     toast('Gemini generation failed: '+e.message,'error');
@@ -2351,7 +2333,7 @@ function clearAllAIQuestions(){
 }
 async function uploadAIQuestionsToSupabase(){
   if(!(await requireAdmin())) return;
-  if(!supabaseClient || !currentUser){toast('Sign in to an administrator account first.','error');return;}
+  if(!SUPABASE_ENABLED || !currentUser){toast('Sign in to an administrator account first.','error');return;}
   if(!aiQuestions.length){toast('There are no AI-generated questions to upload.','error');return;}
   const errors=aiQuestions.map((q,i)=>validateQuestion(q,i)).filter(Boolean);
   if(errors.length){toast('Cannot upload: '+errors[0],'error');return;}
@@ -2377,138 +2359,16 @@ async function uploadAIQuestionsToSupabase(){
 
 function exportAIQuestions(){downloadBlob(JSON.stringify(aiQuestions,null,2),'med64-ai-questions.json','application/json');}
 
-
-/* ============================================================
-   PHASE 5 — Long-term features
-   ============================================================ */
-const PHASE5_KEYS={reports:'med64_question_reports_v1',streak:'med64_study_days_v1'};
-let deferredInstallPrompt=null;
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstallPrompt=e;render();});
-window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;toast('MedEx was installed successfully.','ok');});
-async function installPWA(){
-  if(!deferredInstallPrompt){toast('If the install button is not available, use your browser menu and choose Add to Home Screen.','error');return;}
-  deferredInstallPrompt.prompt();
-  try{await deferredInstallPrompt.userChoice;}catch(e){}
-  deferredInstallPrompt=null; render();
-}
-function localStudyDays(){return new Set(loadJSON(PHASE5_KEYS.streak,[]));}
-function markStudyDay(){
-  const days=localStudyDays(); days.add(new Date().toISOString().slice(0,10));
-  localStorage.setItem(PHASE5_KEYS.streak,JSON.stringify([...days].sort()));
-}
-function studyStreakData(){
-  const days=localStudyDays();
-  getHistory().forEach(h=>{if(h.date)days.add(new Date(h.date).toISOString().slice(0,10));});
-  const today=new Date().toISOString().slice(0,10);
-  const sorted=[...days].sort();
-  let current=0,best=0,run=0,prev=null;
-  for(const d of sorted){
-    const cur=new Date(d+'T00:00:00');
-    if(prev){const diff=Math.round((cur-prev)/86400000); if(diff===1)run++; else run=1;} else run=1;
-    best=Math.max(best,run); prev=cur;
-  }
-  let cursor=new Date(today+'T00:00:00');
-  if(!days.has(today)) cursor.setDate(cursor.getDate()-1);
-  let d=cursor;
-  while(days.has(d.toISOString().slice(0,10))){current++;d.setDate(d.getDate()-1);}
-  return {current,best,today:days.has(today),days};
-}
-function renderStudyStreak(){
-  const s=studyStreakData();
-  const recent=[...s.days].sort().slice(-30).reverse();
-  const body=`<div class="grid stats"><div class="card stat"><div class="label">Current streak</div><div class="value">${s.current}</div><div class="mini">consecutive study days</div></div><div class="card stat"><div class="label">Best streak</div><div class="value">${s.best}</div><div class="mini">all recorded days</div></div><div class="card stat"><div class="label">Days studied</div><div class="value">${s.days.size}</div><div class="mini">recorded on this account/browser</div></div><div class="card stat"><div class="label">Today</div><div class="value">${s.today?'✓':'—'}</div><div class="mini">${s.today?'Study recorded':'Complete an exam or practice today'}</div></div></div><div class="card" style="margin-top:16px"><h3 style="margin-top:0">Recent study days</h3><div class="actions">${recent.map(d=>`<span class="pill">${new Date(d+'T00:00:00').toLocaleDateString()}</span>`).join('')||'<span class="mini">No study days recorded yet.</span>'}</div></div>`;
-  document.getElementById('app').innerHTML=layout('Study Streak','Keep a consistent daily study habit.',body);
-}
-function getQuestionOfDay(){
-  if(!bank.length)return {id:'',question:'No questions are loaded yet.',options:[],correctIndex:-1,module:'',subject:'',lecture:''};
-  const day=new Date().toISOString().slice(0,10);
-  let hash=0; for(let i=0;i<day.length;i++)hash=(hash*31+day.charCodeAt(i))>>>0;
-  return bank[hash%bank.length];
-}
-function renderQuestionOfDay(){
-  const q=getQuestionOfDay();
-  const body=`<div class="card qotd-card"><div class="category-head"><strong>Today's question</strong><span class="pill">${esc(q.module)} · ${esc(q.subject)} · ${esc(q.lecture)}</span></div><div class="question" style="margin-top:16px">${esc(q.question)}</div><div class="options" id="qotdOptions">${(q.options||[]).map((o,i)=>`<button class="option" onclick="answerQuestionOfDay(${i})">${String.fromCharCode(65+i)}. ${esc(o)}</button>`).join('')}</div><div id="qotdResult" style="margin-top:12px"></div><div class="actions" style="margin-top:12px"><button class="btn" onclick="reportQuestion('${attrJs(q.id)}')">⚑ Report this question</button><button class="btn primary" onclick="startExam([getQuestionOfDay()],null,'Question of the Day')">Practice this question</button></div></div>`;
-  document.getElementById('app').innerHTML=layout('Question of the Day','One question selected deterministically for the current day.',body);
-}
-function answerQuestionOfDay(i){
-  const q=getQuestionOfDay(); const buttons=document.querySelectorAll('#qotdOptions .option');
-  buttons.forEach((b,j)=>{b.disabled=true;if(j===q.correctIndex)b.classList.add('correct');if(j===i&&j!==q.correctIndex)b.classList.add('wrong');});
-  const r=document.getElementById('qotdResult'); if(r)r.innerHTML=i===q.correctIndex?'<div class="notice ok">Correct! Read the explanation below.</div>':'<div class="notice error">Incorrect. Review the correct answer below.</div>';
-  if(r)r.innerHTML+=`<div class="review ${i===q.correctIndex?'good':'bad'}">Correct answer: <b>${esc(q.options[q.correctIndex])}</b>${q.explanation?`<br>${esc(q.explanation)}`:''}</div>`;
-  const p=progressRecord(q); p.attempts++; if(i===q.correctIndex){p.correct++;p.last='correct';}else{p.wrong++;p.last='wrong';} scheduleReview(q,i===q.correctIndex); saveState(); markStudyDay();
-  if(supabaseClient&&currentUser){recordAttemptToSupabase(q,i,i===q.correctIndex,'qotd_'+new Date().toISOString().slice(0,10));syncLocalProgressToSupabase();}
-}
-async function reportQuestion(id){
-  const q=bank.find(x=>x.id===id)||allQuestionBank.find(x=>x.id===id)||aiQuestions.find(x=>x.id===id); if(!q)return;
-  const reason=prompt('Why are you reporting this question?\nExamples: wrong answer, unclear wording, duplicate, outdated, other','');
-  if(reason===null)return;
-  const details=prompt('Optional details:','')||'';
-  const report={question_id:q.id,reason:reason.trim()||'Other',details:details.trim(),created_at:new Date().toISOString(),module:q.module,subject:q.subject,lecture:q.lecture};
-  if(supabaseClient){
-    const {error}=await supabaseClient.from('question_reports').insert({question_id:q.id,reporter_id:currentUser?.id||null,reason:report.reason,details:report.details,module:q.module,subject:q.subject,lecture:q.lecture});
-    if(!error){toast('Report submitted to the administrators.','ok');return;}
-    console.warn('Question report sync failed:',error.message);
-  }
-  const local=loadJSON(PHASE5_KEYS.reports,[]);local.push(report);localStorage.setItem(PHASE5_KEYS.reports,JSON.stringify(local));toast('Report saved on this device. It will be available after cloud connection.','ok');
-}
-async function renderAdminAnalytics(){
-  if(!(await requireAdmin()))return;
-  let data=null,reports=[];
-  if(supabaseClient){
-    const a=await supabaseClient.rpc('get_admin_analytics'); if(!a.error)data=a.data;
-    const r=await supabaseClient.rpc('get_question_reports'); if(!r.error)reports=r.data||[];
-  }
-  data=data||{students:globalAnalytics.students||0,submitted_exams:globalAnalytics.submittedExams||0,average_score:globalAnalytics.averageScore||0,questions:bank.length,attempts:0,correct_attempts:0,modules:globalAnalytics.modules||[],lectures:globalAnalytics.lectures||[]};
-  const moduleRows=(data.modules||[]).map(x=>`<div class="progress-row"><b>${esc(x.module||'—')}</b><span>${x.exams||x.submitted_exams||0} exams</span><span>${Number(x.average_score||0).toFixed(1)}%</span></div>`).join('');
-  const reportRows=reports.map(r=>`<div class="category-card"><div class="category-head"><div><b>${esc(r.question_id)}</b><div class="mini">${esc(r.module||'')} · ${esc(r.subject||'')} · ${r.created_at?new Date(r.created_at).toLocaleString():''}</div></div><span class="pill">${esc(r.status||'open')}</span></div><div style="margin-top:7px"><b>${esc(r.reason||'Other')}</b> — ${esc(r.details||'')}</div></div>`).join('');
-  const body=`<div class="grid stats"><div class="card stat admin-kpi"><div class="label">Students</div><div class="value">${data.students||0}</div></div><div class="card stat admin-kpi"><div class="label">Submitted exams</div><div class="value">${data.submitted_exams||0}</div></div><div class="card stat admin-kpi"><div class="label">Average score</div><div class="value">${Number(data.average_score||0).toFixed(1)}%</div></div><div class="card stat admin-kpi"><div class="label">Question reports</div><div class="value">${reports.length}</div></div></div><div class="card" style="margin-top:16px"><div class="category-head"><h3 style="margin:0">Performance by module</h3><button class="btn" onclick="exportAdminAnalytics()">Export analytics</button></div><div style="margin-top:12px">${moduleRows||'<div class="empty">No exam analytics yet.</div>'}</div></div><div class="card" style="margin-top:16px"><h3 style="margin-top:0">Question reports</h3>${reportRows||'<div class="empty">No reports yet.</div>'}</div><div class="card" style="margin-top:16px"><h3 style="margin-top:0">Question versioning & backups</h3><div class="actions"><button class="btn primary" onclick="createFullQuestionBackup()">Create full database backup</button><button class="btn" onclick="downloadQuestionBankBackup()">Download JSON backup</button><button class="btn" onclick="showRecentQuestionVersions()">View recent versions</button></div><div id="versionsPanel" style="margin-top:12px"></div></div>`;
-  document.getElementById('app').innerHTML=layout('Admin Analytics','Shared learning activity, reports, and question-bank safety tools.',body);
-}
-async function exportAdminAnalytics(){
-  if(!(await requireAdmin()))return;
-  const payload={exportedAt:new Date().toISOString(),students:globalAnalytics.students,submittedExams:globalAnalytics.submittedExams,averageScore:globalAnalytics.averageScore,modules:globalAnalytics.modules,subjects:globalAnalytics.subjects||[],lectures:globalAnalytics.lectures||[]};downloadBlob(JSON.stringify(payload,null,2),'medex-admin-analytics.json','application/json');
-}
-async function backupQuestionVersion(id,action,before){
-  if(!supabaseClient||!currentUser||!isAdmin||!before)return;
-  const {error}=await supabaseClient.from('question_versions').insert({question_id:id,action,snapshot:before,changed_by:currentUser.id});
-  if(error)console.warn('Version backup failed:',error.message);
-}
-async function createFullQuestionBackup(){
-  if(!(await requireAdmin()))return;
-  if(!supabaseClient){toast('Supabase is required for cloud backups.','error');return;}
-  const {data,error}=await supabaseClient.rpc('create_question_backup');
-  if(error){toast('Backup failed: '+error.message,'error');return;}
-  downloadQuestionBankBackup(); toast('Full question-bank backup created in Supabase and downloaded.','ok');
-}
-function downloadQuestionBankBackup(){downloadBlob(JSON.stringify({exportedAt:new Date().toISOString(),questions:allQuestionBank},null,2),'medex-question-bank-backup.json','application/json');}
-async function showRecentQuestionVersions(){
-  const el=document.getElementById('versionsPanel'); if(!el||!supabaseClient)return;
-  const {data,error}=await supabaseClient.rpc('get_question_versions');
-  if(error){el.innerHTML='<div class="notice error">Could not load versions: '+esc(error.message)+'</div>';return;}
-  el.innerHTML=(data||[]).map(v=>`<div class="progress-row"><b>${esc(v.question_id)}</b><span>${esc(v.action)}</span><span>${new Date(v.changed_at).toLocaleString()}</span></div>`).join('')||'<div class="empty">No versions recorded yet.</div>';
-}
-
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(e=>console.warn('Service worker registration failed:',e)));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(e=>console.warn('Service worker registration failed:',e)));
 }
-window.addEventListener('error',e=>{
-  console.error('MedEx runtime error:',e.error||e.message);
-  const msg=e?.error?.message||e?.message;
-  if(msg && typeof toast==='function') toast('Site error: '+msg,'error');
-});
-window.addEventListener('unhandledrejection',e=>{
-  console.error('MedEx unhandled promise rejection:',e.reason);
-  const msg=e?.reason?.message||String(e?.reason||'Unknown error');
-  if(msg && typeof toast==='function') toast('Site error: '+msg,'error');
-});
-
 function updateOfflineStatus(){const b=document.getElementById('offlineBanner');if(b)b.hidden=navigator.onLine;}
 window.addEventListener('online',updateOfflineStatus);window.addEventListener('offline',updateOfflineStatus);
 updateOfflineStatus();
 
 document.addEventListener('DOMContentLoaded',()=>{
   applyTheme();
-  if(supabaseClient){
+  if(SUPABASE_ENABLED){
     supabaseClient.auth.onAuthStateChange((event,session)=>{
       setTimeout(()=>{
         currentUser=session?.user||null;
