@@ -282,6 +282,7 @@ const DEFAULT_SETTINGS = {
 };
 
 const DEFAULT_AI_SETTINGS = {
+  provider: 'groq',
   model: 'openai/gpt-oss-120b',
   accessCode: ''
 };
@@ -599,12 +600,9 @@ async function fetchJSON(url){
 async function loadQuestionsFromSupabase(){
   if(!SUPABASE_ENABLED)return false;
   try{
-    // Supabase/PostgREST commonly caps a single response at 1,000 rows.
-    // Load the question bank in pages so MedEx can use 1,000+ questions.
     const PAGE_SIZE=1000;
     const allRows=[];
-    let from=0;
-    while(true){
+    for(let from=0;;from+=PAGE_SIZE){
       const to=from+PAGE_SIZE-1;
       const {data,error}=await supabaseClient
         .from('questions')
@@ -615,9 +613,9 @@ async function loadQuestionsFromSupabase(){
       if(!Array.isArray(data))throw new Error('Invalid questions response.');
       allRows.push(...data);
       if(data.length<PAGE_SIZE)break;
-      from+=PAGE_SIZE;
     }
-    const all=allRows.map(q=>normalizeQuestion({
+    const data=allRows;
+    const all=data.map(q=>normalizeQuestion({
       id:q.id,module:q.module,subject:q.subject,lecture:q.lecture,question:q.question,
       options:q.options,correctIndex:q.correct_index,explanation:q.explanation,
       difficulty:q.difficulty,reference:q.reference,source:'Supabase'
@@ -1237,11 +1235,24 @@ function renderBank(){
   document.getElementById('app').innerHTML=layout('Question Bank','Questions are loaded from Supabase when connected, with GitHub as a fallback.',body);
   filterBank();
 }
-function filterBank(){
+let bankPage=0;
+const BANK_PAGE_SIZE=500;
+function filterBank(resetPage=true){
   const s=(document.getElementById('bankSearch')?.value||'').toLowerCase(),mod=document.getElementById('bankModule')?.value||'',subj=document.getElementById('bankSubject')?.value||'',lect=document.getElementById('bankLecture')?.value||'',src=document.getElementById('bankSource')?.value||'';
+  if(resetPage) bankPage=0;
   const list=bank.filter(q=>(!s||[q.id,q.question,q.subject,q.module,q.lecture].join(' ').toLowerCase().includes(s))&&(!mod||q.module===mod)&&(!subj||q.subject===subj)&&(!lect||q.lecture===lect)&&(!src||q.source===src));
   const rows=document.getElementById('bankRows');if(!rows)return;
-  rows.innerHTML=list.slice(0,500).map(q=>`<tr><td><b>${esc(q.id)}</b></td><td>${esc(q.module)}</td><td>${esc(q.subject)}</td><td>${esc(q.lecture)}</td><td>${esc(q.question)}</td><td>${progressFor([q])}% · ${accuracyFor([q])}% acc.</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No matching questions.</td></tr>';
+  const totalPages=Math.max(1,Math.ceil(list.length/BANK_PAGE_SIZE));
+  if(bankPage>=totalPages) bankPage=totalPages-1;
+  const start=bankPage*BANK_PAGE_SIZE;
+  const pageRows=list.slice(start,start+BANK_PAGE_SIZE);
+  rows.innerHTML=pageRows.map(q=>`<tr><td><b>${esc(q.id)}</b></td><td>${esc(q.module)}</td><td>${esc(q.subject)}</td><td>${esc(q.lecture)}</td><td>${esc(q.question)}</td><td>${progressFor([q])}% · ${accuracyFor([q])}% acc.</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No matching questions.</td></tr>';
+  const table=rows.closest('.table-wrap');
+  if(table){
+    let pager=document.getElementById('bankPager');
+    if(!pager){ pager=document.createElement('div'); pager.id='bankPager'; pager.className='actions'; table.parentElement.appendChild(pager); }
+    pager.innerHTML=`<span class="mini">Showing ${list.length?start+1:0}–${Math.min(start+BANK_PAGE_SIZE,list.length)} of ${list.length} matching questions</span><button class="btn" ${bankPage<=0?'disabled':''} onclick="bankPage--;filterBank(false)">Previous</button><span class="mini">Page ${bankPage+1} / ${totalPages}</span><button class="btn" ${bankPage>=totalPages-1?'disabled':''} onclick="bankPage++;filterBank(false)">Next</button>`;
+  }
 }
 
 function renderImport(){
@@ -1629,51 +1640,91 @@ function exportBank(){ if(!isAdmin){toast('Admin access required.','error');retu
 function exportHistory(){downloadBlob(JSON.stringify({exportedAt:new Date().toISOString(),history:loadJSON(CONFIG.historyKey,[])},null,2),'med64-exam-history.json','application/json');}
 
 /* ============================================================
-   AI Assistant (Groq)
-   - Generates new questions in the site's question format
-   - Lets the user chat with the model about anything
-   - Generated questions are kept separate until added to the bank
-   - The API key lives only in this browser and calls Google's
-     Groq API through a server-side Vercel proxy (/api/groq),
-     so visitors never need to bring their own API key.
+   AI Assistant (multi-provider)
+   - Groq direct
+   - Gemini direct
+   - OpenRouter (third provider / multi-model gateway)
+   - API credentials stay server-side in Vercel environment variables
    ============================================================ */
 
 let aiTab='generate';
 
-async function callGroq(contents, generationConfig){
+const AI_PROVIDER_MODELS={
+  groq:[
+    {id:'openai/gpt-oss-120b',label:'GPT-OSS 120B — high reasoning'},
+    {id:'qwen/qwen3-32b',label:'Qwen 3 32B — structured / high volume'}
+  ],
+  gemini:[
+    {id:'gemini-3.6-flash',label:'Gemini 3.6 Flash — recommended for MCQ generation'}
+  ],
+  openrouter:[
+    {id:'openrouter/free',label:'OpenRouter Free Router — structured JSON (recommended)'},
+    {id:'google/gemma-4-31b-it:free',label:'Gemma 4 31B — free + JSON'},
+    {id:'inclusionai/ling-3.0-flash-sante:free',label:'Ling 3.0 Flash Sante — medical (JSON fallback)'},
+    {id:'nvidia/nemotron-3-ultra-550b-a55b:free',label:'NVIDIA Nemotron 3 Ultra — JSON fallback'}
+  ]
+};
+
+function aiProviderLabel(provider){
+  return provider==='gemini'?'Google Gemini':provider==='openrouter'?'OpenRouter':'Groq';
+}
+function ensureAIModelForProvider(){
+  if(aiSettings.provider==='vercel') aiSettings.provider='openrouter';
+  const provider=aiSettings.provider||'groq';
+  const models=AI_PROVIDER_MODELS[provider]||AI_PROVIDER_MODELS.groq;
+  if(!models.some(m=>m.id===aiSettings.model)) aiSettings.model=models[0].id;
+}
+ensureAIModelForProvider();
+
+async function callAI(contents, generationConfig){
   let res, data;
   const headers={'Content-Type':'application/json'};
   if(aiSettings.accessCode) headers['x-access-code']=aiSettings.accessCode;
   try{
-    res=await fetch('/api/groq',{
+    res=await fetch('/api/ai',{
       method:'POST',
       headers,
-      body:JSON.stringify({contents, generationConfig, model: aiSettings.model || undefined})
+      body:JSON.stringify({
+        provider:aiSettings.provider||'groq',
+        model:aiSettings.model,
+        contents,
+        generationConfig
+      })
     });
   }catch(e){
     throw new Error('Could not reach the AI service. Check your connection.');
   }
   try{ data=await res.json(); }catch(e){ data=null; }
   if(!res.ok){
-    throw new Error((data && data.error) || `HTTP ${res.status} from the AI service.`);
+    throw new Error((data&&data.error)||`HTTP ${res.status} from the AI service.`);
   }
-  const text=data && data.text;
-  if(!text) throw new Error('Groq returned an empty response.');
+  const text=data&&data.text;
+  if(!text) throw new Error(`${aiProviderLabel(aiSettings.provider)} returned an empty response.`);
   return text;
 }
 
 function renderAIAssistant(){
+  ensureAIModelForProvider();
+  const provider=aiSettings.provider||'groq';
+  const models=AI_PROVIDER_MODELS[provider]||AI_PROVIDER_MODELS.groq;
   const body=`
   <div class="card">
-    <div class="category-head"><strong>Groq AI</strong><span class="ai-badge">✦ GPT-OSS 120B</span></div>
-    <p class="mini" style="margin:8px 0 0">Questions and chat are powered by this site's own server (a Vercel serverless function). Nobody needs to bring a personal API key — the Groq API key lives only on the Vercel server and is never exposed to the browser.</p>
+    <div class="category-head"><strong>AI Assistant</strong><span class="ai-badge">✦ ${esc(aiProviderLabel(provider))}</span></div>
+    <p class="mini" style="margin:8px 0 0">Choose the AI provider and model used for question generation and AI chat. API keys stay on the Vercel server and are never exposed to website visitors.</p>
+    <div class="grid two" style="margin-top:12px">
+      <div class="field"><label>AI provider</label><select id="aiProvider" onchange="changeAIProvider()">
+        <option value="groq" ${provider==='groq'?'selected':''}>Groq</option>
+        <option value="gemini" ${provider==='gemini'?'selected':''}>Google Gemini</option>
+        <option value="openrouter" ${provider==='openrouter'?'selected':''}>OpenRouter</option>
+      </select></div>
+      <div class="field"><label>AI model</label><select id="aiModel">${models.map(m=>`<option value="${attrJs(m.id)}" ${m.id===aiSettings.model?'selected':''}>${esc(m.label)}</option>`).join('')}</select></div>
+    </div>
     <details style="margin-top:10px">
       <summary class="mini" style="cursor:pointer;color:var(--primary2);font-weight:700">Advanced settings</summary>
       <div class="grid two" style="margin-top:10px">
-        <div class="field"><label>Groq model override (optional)</label><input id="aiModel" placeholder="openai/gpt-oss-120b" value="${esc(aiSettings.model)}"></div>
         <div class="field"><label>Access code (only if this site requires one)</label><input id="aiAccessCode" type="password" placeholder="Leave blank if none" value="${esc(aiSettings.accessCode)}"></div>
       </div>
-      <div class="actions" style="margin-top:10px"><button class="btn" onclick="saveAISettings()">Save</button></div>
+      <div class="actions" style="margin-top:10px"><button class="btn" onclick="saveAISettings()">Save AI settings</button></div>
     </details>
   </div>
 
@@ -1683,16 +1734,23 @@ function renderAIAssistant(){
   </div>
 
   ${aiTab==='generate'?aiGenerateTabHTML():aiChatTabHTML()}`;
-  document.getElementById('app').innerHTML=layout('AI Assistant','Generate practice questions or ask Groq anything.',body);
+  document.getElementById('app').innerHTML=layout('AI Assistant',`Generate practice questions or ask ${aiProviderLabel(provider)}.`,body);
   if(aiTab==='chat') scrollChatToBottom();
 }
 function setAITab(tab){ aiTab=tab; renderAIAssistant(); }
+function changeAIProvider(){
+  const provider=document.getElementById('aiProvider')?.value||'groq';
+  aiSettings.provider=provider;
+  ensureAIModelForProvider();
+  localStorage.setItem(CONFIG.aiSettingsKey,JSON.stringify(aiSettings));
+  renderAIAssistant();
+}
 
 function aiGenerateTabHTML(){
   const modules=getModules();
   return `<div class="card">
-    <h3 style="margin-top:0">Generate questions with Groq GPT-OSS 120B</h3>
-    <p class="mini" style="margin:6px 0 14px">Choose from the modules, subjects and lectures that already exist in your website question bank. Then choose whether Groq should use its medical knowledge or your website questions as the source.</p>
+    <h3 style="margin-top:0">Generate questions with ${esc(aiProviderLabel(aiSettings.provider))} · ${esc((AI_PROVIDER_MODELS[aiSettings.provider]||[]).find(m=>m.id===aiSettings.model)?.label||aiSettings.model)}</h3>
+    <p class="mini" style="margin:6px 0 14px">Choose from the modules, subjects and lectures that already exist in your website question bank. Then choose whether the selected AI should use its medical knowledge or your website questions as the source.</p>
     <div class="grid three">
       <div class="field"><label>Module</label><select id="genModule" onchange="updateAIGeneratorSubjects()"><option value="">Select module</option>${modules.map(m=>`<option value="${attrJs(m)}">${esc(m)}</option>`).join('')}</select></div>
       <div class="field"><label>Subject</label><select id="genSubject" onchange="updateAIGeneratorLectures()" disabled><option value="">Select subject</option></select></div>
@@ -1709,9 +1767,9 @@ function aiGenerateTabHTML(){
         <option value="Higher-order thinking" selected>Higher-order thinking</option>
         <option value="Mixed thinking">Mixed thinking</option>
       </select></div>
-      <div class="field"><label>Number of questions</label><input id="genCount" type="number" min="1" max="30" value="5"></div>
+      <div class="field"><label>Number of questions</label><input id="genCount" type="number" min="1" max="100" value="5"></div>
       <div class="field"><label>Question source</label><select id="genSourceType" onchange="updateAIGeneratorSourceUI()">
-        <option value="knowledge">Groq medical knowledge</option>
+        <option value="knowledge">AI medical knowledge</option>
         <option value="website">Questions in this website</option>
       </select></div>
     </div>
@@ -1763,17 +1821,17 @@ function updateAIGeneratorSourceUI(){
   if(type==='website') {
     box.className='notice '+(pool.length?'ok':'error');
     box.textContent=pool.length
-      ? `Groq will use ${pool.length} existing website question${pool.length===1?'':'s'} from this exact lecture as source material and create new, non-copying questions.`
+      ? `The selected AI will use ${pool.length} existing website question${pool.length===1?'':'s'} from this exact lecture as source material and create new, non-copying questions.`
       : 'No website questions exist for this exact module, subject and lecture. Choose Groq medical knowledge or select another lecture.';
   } else {
     box.className='notice';
-    box.textContent='Groq will create original higher-order questions using its medical knowledge for the selected module, subject and lecture.';
+    box.textContent='The selected AI will create original higher-order questions using its medical knowledge for the selected module, subject and lecture.';
   }
 }
 
 function aiChatTabHTML(){
   return `<div class="card">
-    <div class="category-head"><strong>Ask Groq anything</strong>${aiChat.length?'<button class="btn" onclick="clearAIChat()">Clear chat</button>':''}</div>
+    <div class="category-head"><strong>Ask AI anything</strong>${aiChat.length?'<button class="btn" onclick="clearAIChat()">Clear chat</button>':''}</div>
     <div class="chat-log" id="chatLog" style="margin-top:12px">${aiChat.length?aiChat.map(m=>`<div class="chat-msg ${m.role==='ai'?'ai':m.role==='error'?'error':'user'}">${esc(m.text)}</div>`).join(''):'<div class="empty">Ask a medical or exam-prep question to get started.</div>'}</div>
     <div class="chat-input-row">
       <textarea id="chatInput" placeholder="Ask anything…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAIChat();}"></textarea>
@@ -1782,10 +1840,12 @@ function aiChatTabHTML(){
   </div>`;
 }
 function saveAISettings(){
-  aiSettings.model=document.getElementById('aiModel').value.trim();
-  aiSettings.accessCode=document.getElementById('aiAccessCode').value.trim();
+  aiSettings.provider=document.getElementById('aiProvider')?.value||'groq';
+  aiSettings.model=document.getElementById('aiModel')?.value.trim()||'';
+  aiSettings.accessCode=document.getElementById('aiAccessCode')?.value.trim()||'';
+  ensureAIModelForProvider();
   localStorage.setItem(CONFIG.aiSettingsKey,JSON.stringify(aiSettings));
-  toast('Settings saved.','ok');
+  toast(`AI provider saved: ${aiProviderLabel(aiSettings.provider)}.`,'ok');
 }
 
 function formatAIChatReply(reply){
@@ -1821,14 +1881,44 @@ function formatAIChatReply(reply){
 }
 
 function parseAIQuestionJSON(text){
-  let cleaned=text.trim().replace(/^```json/i,'').replace(/^```/,'').replace(/```\s*$/,'').trim();
-  const start=cleaned.indexOf('['), end=cleaned.lastIndexOf(']');
-  if(start!==-1 && end!==-1 && end>start) cleaned=cleaned.slice(start,end+1);
-  let parsed;
-  try{ parsed=JSON.parse(cleaned); }
-  catch(e){ throw new Error('Could not parse the AI response as JSON.'); }
-  if(!Array.isArray(parsed)) throw new Error('AI response was not a JSON array.');
-  return parsed;
+  let cleaned=String(text||'').trim();
+  cleaned=cleaned.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();
+
+  // First try the response exactly as returned.
+  try{
+    const parsed=JSON.parse(cleaned);
+    if(Array.isArray(parsed)) return parsed;
+    if(parsed && Array.isArray(parsed.questions)) return parsed.questions;
+  }catch(_){}
+
+  // Extract the largest complete JSON array from surrounding prose/code fences.
+  const start=cleaned.indexOf('[');
+  const end=cleaned.lastIndexOf(']');
+  if(start!==-1 && end>start){
+    const candidate=cleaned.slice(start,end+1).trim();
+    try{
+      const parsed=JSON.parse(candidate);
+      if(Array.isArray(parsed)) return parsed;
+    }catch(_){
+      const repaired=candidate.replace(/,\s*([}\]])/g,'$1');
+      try{
+        const parsed=JSON.parse(repaired);
+        if(Array.isArray(parsed)) return parsed;
+      }catch(_){}
+    }
+  }
+
+  // Some models return a single object for a one-question batch.
+  const objStart=cleaned.indexOf('{');
+  const objEnd=cleaned.lastIndexOf('}');
+  if(objStart!==-1 && objEnd>objStart){
+    try{
+      const parsed=JSON.parse(cleaned.slice(objStart,objEnd+1));
+      if(parsed && parsed.question && Array.isArray(parsed.options)) return [parsed];
+    }catch(_){}
+  }
+
+  throw new Error('The AI returned invalid JSON. MedEx now uses OpenRouter structured-output routing for MCQ generation. Please retry.');
 }
 function aiQuestionPreviewCard(q){
   const diffClass=(q.difficulty||'').toLowerCase();
@@ -1844,24 +1934,21 @@ async function generateAIQuestions(){
   const lecture=document.getElementById('genLecture').value.trim();
   const difficulty=document.getElementById('genDifficulty').value;
   const thinkingLevel=document.getElementById('genThinking')?.value||'Higher-order thinking';
-  const count=Math.max(1,Math.min(30,Number(document.getElementById('genCount').value)||5));
+  const count=Math.max(1,Math.min(100,Number(document.getElementById('genCount').value)||5));
   const sourceType=document.getElementById('genSourceType').value;
   const sourcePool=getAIGeneratorPool();
 
   if(!module||!subject||!lecture){toast('Select a module, subject and lecture from the website lists.','error');return;}
-  if(sourceType==='website'&&!sourcePool.length){toast('No website questions exist for this exact lecture. Choose another lecture or use Groq medical knowledge.','error');return;}
+  if(sourceType==='website'&&!sourcePool.length){toast('No website questions exist for this exact lecture. Choose another lecture or use AI medical knowledge.','error');return;}
 
   const btn=document.getElementById('genBtn');
   const resultBox=document.getElementById('genResult');
   aiBusy=true;
   if(btn){btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Generating…';}
-  if(resultBox) resultBox.innerHTML='<div class="card" style="margin-top:14px"><div class="mini">Contacting Groq GPT-OSS 120B…</div></div>';
 
   let sourceBlock='';
-  let reference='Groq GPT-OSS 120B medical knowledge';
+  let reference=`${aiProviderLabel(aiSettings.provider)} · ${aiSettings.model} medical knowledge`;
   if(sourceType==='website'){
-    // Keep the source compact enough for high-volume generation while preserving
-    // the actual wording, options, correct answer and explanation from the site.
     const sourceQuestions=sourcePool.slice(0,80).map((q,i)=>({
       number:i+1, question:q.question, options:q.options, correctAnswer:q.options[q.correctIndex], explanation:q.explanation
     }));
@@ -1874,14 +1961,27 @@ ${JSON.stringify(sourceQuestions)}`;
     sourceBlock='Use your medical knowledge to create accurate original questions for the selected topic. Do not invent facts or cite nonexistent sources.';
   }
 
-  const prompt=`You are the medical question generator for Med64, a medical examination platform.
-Generate exactly ${count} original multiple-choice questions for medical students.
+  // Generate in small batches. OpenRouter free/low-credit keys can reject a request
+  // before generation if max output tokens exceed the remaining credit allowance.
+  // Keep OpenRouter batches smaller and the requested output budget conservative.
+  const batchSize=aiSettings.provider==='openrouter' ? 1 : Math.min(10,count);
+  const batches=[];
+  for(let n=0;n<count;n+=batchSize) batches.push(Math.min(batchSize,count-n));
+  const allRaw=[];
+
+  try{
+    for(let bi=0;bi<batches.length;bi++){
+      const batchCount=batches[bi];
+      if(resultBox) resultBox.innerHTML=`<div class="card" style="margin-top:14px"><div class="mini">Generating batch ${bi+1} of ${batches.length} (${allRaw.length}/${count} questions completed) with ${esc(aiProviderLabel(aiSettings.provider))}…</div></div>`;
+
+      const prompt=`You are the medical question generator for Med64, a medical examination platform.
+Generate exactly ${batchCount} original multiple-choice questions for medical students.
 Module: ${module}
 Subject: ${subject}
 Lecture: ${lecture}
 Difficulty: ${difficulty}
 Thinking level: ${thinkingLevel}
-Question source: ${sourceType==='website'?'questions already in this website':'Groq medical knowledge'}
+Question source: ${sourceType==='website'?'questions already in this website':'selected AI medical knowledge'}
 
 ${sourceBlock}
 
@@ -1893,18 +1993,27 @@ Rules:
 - Make distractors plausible and based on common misconceptions or clinically relevant alternatives.
 - Avoid duplicate questions and avoid copying source wording.
 - Keep the questions focused on the selected lecture.
-- Return ONLY a JSON array, with no markdown fences or commentary.
-- Each item must have this exact shape:
-{"question":"...","options":["...","...","...","..."],"correctIndex":0,"explanation":"...","difficulty":"${difficulty}"}
+- Return ONLY a valid JSON array. No markdown fences, no commentary, and no text before or after the array.
+- Each item must have exactly this shape:
+{"question":"...","options":["A","B","C","D"],"correctIndex":0,"explanation":"Brief justification.","difficulty":"${difficulty}"}
 - correctIndex is zero-based.
-- explanation should briefly justify the correct answer.`;
+- Keep each question concise and each explanation to 1–2 sentences.
+- For this batch, return exactly ${batchCount} complete objects.
+- Do not stop in the middle of an object. Return the complete JSON array.`;
 
-  try{
-    const text=await callGroq([{role:'user',parts:[{text:prompt}]}],{maxOutputTokens:Math.min(12000,Math.max(2500,count*500))});
-    const rawList=parseAIQuestionJSON(text);
-    if(!rawList.length) throw new Error('No questions were returned. Try again or adjust your selections.');
+      const text=await callAI([{role:'user',parts:[{text:prompt}]}],{
+        maxOutputTokens: aiSettings.provider==='openrouter'
+          ? 2200
+          : Math.min(16000, Math.max(5000, batchCount*700)),
+        jsonMode: aiSettings.provider==='openrouter'
+      });
+      const rawList=parseAIQuestionJSON(text);
+      if(!rawList.length) throw new Error(`Batch ${bi+1} returned no questions.`);
+      allRaw.push(...rawList.slice(0,batchCount));
+      if(rawList.length<batchCount) throw new Error(`${aiProviderLabel(aiSettings.provider)} returned only ${rawList.length} of ${batchCount} questions in batch ${bi+1}. Please try again.`);
+    }
 
-    const stamped=rawList.slice(0,count).map((raw,i)=>normalizeQuestion({
+    const stamped=allRaw.slice(0,count).map((raw,i)=>normalizeQuestion({
       id:`ai-${Date.now()}-${i}-${Math.random().toString(36).slice(2,6)}`,
       module: `${module} AI generated`, subject, lecture,
       difficulty: raw.difficulty || difficulty,
@@ -1916,20 +2025,20 @@ Rules:
     },'AI generated'));
 
     const errors=stamped.map((q,i)=>validateQuestion(q,i)).filter(Boolean);
-    if(errors.length) throw new Error('Groq returned a malformed question: '+errors[0]);
-    if(stamped.length<count) throw new Error(`Groq returned ${stamped.length} questions instead of ${count}. Please try again.`);
+    if(errors.length) throw new Error(`${aiProviderLabel(aiSettings.provider)} returned a malformed question: ${errors[0]}`);
+    if(stamped.length<count) throw new Error(`${aiProviderLabel(aiSettings.provider)} returned ${stamped.length} questions instead of ${count}. Please try again.`);
 
     aiQuestions.push(...stamped);
     localStorage.setItem(CONFIG.aiQuestionsKey,JSON.stringify(aiQuestions));
 
-    if(resultBox) resultBox.innerHTML=`<div class="card" style="margin-top:14px"><div class="notice ok">Generated ${stamped.length} question${stamped.length===1?'':'s'} from ${sourceType==='website'?'your website question bank':'Groq medical knowledge'}.</div>
-    <div class="mini" style="margin-top:8px">${esc(module+' AI generated')} · ${esc(subject)} · ${esc(lecture)}</div>
+    if(resultBox) resultBox.innerHTML=`<div class="card" style="margin-top:14px"><div class="notice ok">Generated ${stamped.length} question${stamped.length===1?'':'s'} from ${sourceType==='website'?'your website question bank':'AI medical knowledge'}.</div>
+    <div class="mini" style="margin-top:8px">${esc(module+' AI generated')} · ${esc(subject)} · ${esc(lecture)} · ${esc(aiProviderLabel(aiSettings.provider))}</div>
     <div style="margin-top:12px">${stamped.map(q=>aiQuestionPreviewCard(q)).join('')}</div>
     <div class="actions" style="margin-top:12px"><button class="btn primary" onclick="go('aiquestions')">Review in AI Questions</button></div></div>`;
-    toast(`Generated ${stamped.length} questions with Groq GPT-OSS 120B.`,'ok');
+    toast(`Generated ${stamped.length} questions with ${aiProviderLabel(aiSettings.provider)}.`,'ok');
   }catch(e){
     if(resultBox) resultBox.innerHTML=`<div class="card" style="margin-top:14px"><div class="notice error">Generation failed: ${esc(e.message)}</div></div>`;
-    toast('Groq generation failed: '+e.message,'error');
+    toast(`${aiProviderLabel(aiSettings.provider)} generation failed: `+e.message,'error');
   }finally{
     aiBusy=false;
     if(btn){btn.disabled=false; btn.textContent='Generate questions';}
@@ -1959,7 +2068,7 @@ async function sendAIChat(){
         ? `Answer the user's message in ordinary, readable text. Do NOT return JSON, JSON arrays, code blocks, or a machine-readable object. Use normal sentences, short paragraphs, and bullet points when useful. If the user asks for an explanation, explain it clearly rather than formatting it as JSON.\n\nUser message:\n${m.text}`
         : m.text}]
     }));
-    const reply=await callGroq(contents,{maxOutputTokens:4096,responseMimeType:'text/plain'});
+    const reply=await callAI(contents,{maxOutputTokens:4096,responseMimeType:'text/plain'});
     aiChat.push({role:'ai',text:formatAIChatReply(reply)});
   }catch(e){
     aiChat.push({role:'error',text:'Error: '+e.message});
