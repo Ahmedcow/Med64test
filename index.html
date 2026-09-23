@@ -555,7 +555,7 @@ async function renderAdminAnalytics(){
     return;
   }
   const body=`<div class="card"><div class="category-head"><div><h3 style="margin:0">Site usage analytics</h3><div class="mini" style="margin-top:6px">Counts include both signed-in and non-signed-in users. Only submitted exams and answered questions are collected.</div></div><button class="btn primary" onclick="refreshAdminAnalytics()">Refresh</button></div></div>
-  <div id="adminUsageAnalytics" class="grid two" style="margin-top:16px"><div class="card stat"><div class="label">Submitted exams</div><div class="value">…</div></div><div class="card stat"><div class="label">Answered questions</div><div class="value">…</div></div></div>
+  <div id="adminUsageAnalytics" class="grid two" style="margin-top:16px"><div class="card stat"><div class="label">Submitted exams</div><div class="value">…</div></div><div class="card stat"><div class="label">Answered questions</div><div class="value">…</div></div><div class="card stat"><div class="label">Signed-in users</div><div class="value">…</div></div><div class="card stat"><div class="label">Anonymous visitors</div><div class="value">…</div></div></div>
   <div class="mini" style="margin-top:12px">No question text, answers, scores, email addresses, or other student details are displayed on this page.</div>`;
   document.getElementById('app').innerHTML=layout('Analytics','Administrator-only aggregate usage counts.',body);
   await refreshAdminAnalytics();
@@ -565,7 +565,7 @@ async function refreshAdminAnalytics(){
   el.innerHTML='<div class="card"><div class="mini">Loading analytics…</div></div>';
   const d=await loadAdminUsageAnalytics();
   if(d?.error){el.innerHTML=`<div class="card" style="grid-column:1/-1"><div class="notice error">${esc(d.error)}</div><div class="mini" style="margin-top:8px">Make sure the analytics SQL table/policies and the Vercel SUPABASE_SERVICE_ROLE_KEY are configured.</div></div>`;return;}
-  el.innerHTML=`<div class="card stat"><div class="label">Submitted exams</div><div class="value">${Number(d?.submittedExams||0).toLocaleString()}</div></div><div class="card stat"><div class="label">Answered questions</div><div class="value">${Number(d?.answeredQuestions||0).toLocaleString()}</div></div>`;
+  el.innerHTML=`<div class="card stat"><div class="label">Submitted exams</div><div class="value">${Number(d?.submittedExams||0).toLocaleString()}</div></div><div class="card stat"><div class="label">Answered questions</div><div class="value">${Number(d?.answeredQuestions||0).toLocaleString()}</div></div><div class="card stat"><div class="label">Signed-in users</div><div class="value">${Number(d?.signedInUsers||0).toLocaleString()}</div></div><div class="card stat"><div class="label">Anonymous visitors</div><div class="value">${Number(d?.anonymousVisitors||0).toLocaleString()}</div></div>`;
 }
 
 function globalModuleStats(module){
