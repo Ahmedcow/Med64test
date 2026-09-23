@@ -176,6 +176,12 @@ h1,h2,h3{font-family:var(--font-serif);font-weight:600;letter-spacing:-.01em;mar
 .category-head{display:flex;justify-content:space-between;gap:10px;align-items:center}
 .mini{font-size:12px;color:var(--muted)}
 
+/* ---------- Phase 3 AI review ---------- */
+.ai-edit{margin-top:12px;padding:14px;border:1px dashed var(--primary);border-radius:var(--radius-sm);background:var(--primary-soft)}
+.ai-edit textarea{width:100%;border:1px solid var(--line);background:var(--card);border-radius:var(--radius-sm);padding:9px;color:var(--text);margin-top:5px;min-height:90px;resize:vertical}
+.ai-edit input,.ai-edit select{width:100%;border:1px solid var(--line);background:var(--card);border-radius:var(--radius-sm);padding:9px;color:var(--text);margin-top:5px}
+.ai-duplicate{border-left:4px solid var(--warn)}
+
 /* ---------- AI assistant ---------- */
 .ai-badge{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--primary2);background:var(--primary-soft);border-radius:999px;padding:3px 10px}
 .tabbar{display:flex;gap:6px;border-bottom:1px solid var(--line);margin-bottom:16px;flex-wrap:wrap}
@@ -1002,7 +1008,7 @@ function renderQuiz(){
   const remaining=exam.minutes?Math.max(0,exam.minutes*60-Math.floor((Date.now()-exam.started)/1000)):0;
   const answeredCount=exam.list.filter(item=>exam.answers[item.id]!==undefined).length;
   const body=`<div class="quiz"><div class="card">
-    <div class="qhead"><span class="pill">${exam.index+1} / ${exam.list.length}</span><span class="mini">${esc(q.module)} · ${esc(q.subject)} · ${esc(q.lecture)}</span><button class="btn" style="margin-left:auto" onclick="toggleFavorite('${attrJs(q.id)}')">${isFavorite(q)?'★':'☆'}</button>${exam.minutes?`<span class="timer" id="timer">${formatTime(remaining)}</span>`:''}</div>
+    <div class="qhead"><span class="pill">${exam.index+1} / ${exam.list.length}</span><span class="mini">${esc(q.module)} · ${esc(q.subject)} · ${esc(q.lecture)}</span><button type="button" class="btn" style="margin-left:auto" onclick="toggleFavorite('${attrJs(q.id)}')">${isFavorite(q)?'★':'☆'}</button>${exam.minutes?`<span class="timer" id="timer">${formatTime(remaining)}</span>`:''}</div>
     <div class="bar"><i style="width:${pct(exam.index,exam.list.length-1)}%"></i></div>
     <div class="question-nav" aria-label="Question navigation">
       <div style="width:100%;display:flex;justify-content:space-between;align-items:center">
@@ -1247,6 +1253,10 @@ function isFavorite(q){ return favorites.has(key(q)); }
 function toggleFavorite(id){
   if(favorites.has(id)) favorites.delete(id); else favorites.add(id);
   saveState();
+  // Do not route away from an active exam/study session. Re-render only the
+  // current question so the timer, answers, position and session stay intact.
+  if(exam && !exam.submitted){ renderQuiz(); return; }
+  if(studySession){ renderStudyQuestion(); return; }
   render();
 }
 function progressRecord(q){
@@ -1343,7 +1353,7 @@ function renderStudyQuestion(){
   const answered=chosen!==undefined;
   const opts=q.options.map((o,i)=>{let cls='option'; if(answered){if(i===q.correctIndex)cls+=' correct'; if(i===chosen&&i!==q.correctIndex)cls+=' wrong';} return `<button class="${cls}" ${answered?'disabled':''} onclick="answerStudy(${i})">${String.fromCharCode(65+i)}. ${esc(o)}</button>`}).join('');
   const p=progress[key(q)];
-  const body=`<div class="card"><div class="qhead"><span class="pill">${studySession.index+1} / ${studySession.list.length}</span><span class="mini">${esc(q.module)} · ${esc(q.subject)} · ${esc(q.lecture)}</span><button class="btn" style="margin-left:auto" onclick="toggleFavorite('${attrJs(q.id)}')">${isFavorite(q)?'★ Favorited':'☆ Favorite'}</button></div><div class="bar"><i style="width:${pct(studySession.index,studySession.list.length-1)}%"></i></div><div class="mini" style="margin-top:8px">${reviewLabel(q)}${p?.streak?` · ${p.streak} correct streak`:''}</div><div class="question" style="margin-top:16px">${esc(q.question)}</div><div class="options">${opts}</div>${answered?`<div class="review ${chosen===q.correctIndex?'good':'bad'}"><b>${chosen===q.correctIndex?'Correct':'Incorrect'}</b><br>Correct answer: <b>${esc(q.options[q.correctIndex])}</b>${q.explanation?`<br>${esc(q.explanation)}`:'<br>No explanation provided.'}</div>`:''}<div class="quiz-footer"><button class="btn" onclick="go('study')">Exit</button>${answered?`<button class="btn primary" onclick="nextStudy()">${studySession.index===studySession.list.length-1?'Finish':'Next'}</button>`:''}</div></div>`;
+  const body=`<div class="card"><div class="qhead"><span class="pill">${studySession.index+1} / ${studySession.list.length}</span><span class="mini">${esc(q.module)} · ${esc(q.subject)} · ${esc(q.lecture)}</span><button type="button" class="btn" style="margin-left:auto" onclick="toggleFavorite('${attrJs(q.id)}')">${isFavorite(q)?'★ Favorited':'☆ Favorite'}</button></div><div class="bar"><i style="width:${pct(studySession.index,studySession.list.length-1)}%"></i></div><div class="mini" style="margin-top:8px">${reviewLabel(q)}${p?.streak?` · ${p.streak} correct streak`:''}</div><div class="question" style="margin-top:16px">${esc(q.question)}</div><div class="options">${opts}</div>${answered?`<div class="review ${chosen===q.correctIndex?'good':'bad'}"><b>${chosen===q.correctIndex?'Correct':'Incorrect'}</b><br>Correct answer: <b>${esc(q.options[q.correctIndex])}</b>${q.explanation?`<br>${esc(q.explanation)}`:'<br>No explanation provided.'}</div>`:''}<div class="quiz-footer"><button class="btn" onclick="go('study')">Exit</button>${answered?`<button class="btn primary" onclick="nextStudy()">${studySession.index===studySession.list.length-1?'Finish':'Next'}</button>`:''}</div></div>`;
   document.getElementById('app').innerHTML=layout('Study Session','Answer first, then review the explanation.',body);
 }
 function answerStudy(i){
@@ -1854,7 +1864,7 @@ function aiGenerateTabHTML(){
         <option value="Higher-order thinking" selected>Higher-order thinking</option>
         <option value="Mixed thinking">Mixed thinking</option>
       </select></div>
-      <div class="field"><label>Number of questions</label><input id="genCount" type="number" min="1" max="30" value="5"></div>
+      <div class="field"><label>Number of questions (batch)</label><input id="genCount" type="number" min="1" max="50" value="5"></div>
       <div class="field"><label>Question source</label><select id="genSourceType" onchange="updateAIGeneratorSourceUI()">
         <option value="knowledge">Gemini medical knowledge</option>
         <option value="website">Questions in this website</option>
@@ -1982,6 +1992,30 @@ function aiQuestionPreviewCard(q){
     <div class="mini" style="margin-top:4px">${esc(q.module)} · ${esc(q.subject)} · ${esc(q.lecture)}</div>
   </div>`;
 }
+function normalizeAIQuestionText(text){
+  return String(text||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+}
+function aiQuestionSimilarity(a,b){
+  const aa=new Set(normalizeAIQuestionText(a).split(' ').filter(Boolean));
+  const bb=new Set(normalizeAIQuestionText(b).split(' ').filter(Boolean));
+  if(!aa.size||!bb.size)return 0;
+  let intersection=0; aa.forEach(x=>{if(bb.has(x))intersection++;});
+  return intersection/(aa.size+bb.size-intersection);
+}
+function isDuplicateAIQuestion(q, candidates){
+  const text=normalizeAIQuestionText(q.question);
+  return candidates.some(x=>normalizeAIQuestionText(x.question)===text || aiQuestionSimilarity(q.question,x.question)>=0.88);
+}
+function uniqueAIQuestions(list){
+  const accepted=[];
+  const existing=[...bank,...aiQuestions];
+  for(const q of list){
+    if(isDuplicateAIQuestion(q,existing)||isDuplicateAIQuestion(q,accepted)) continue;
+    accepted.push(q);
+  }
+  return accepted;
+}
+
 async function generateAIQuestions(){
   if(aiBusy) return;
   const module=document.getElementById('genModule').value.trim();
@@ -1989,7 +2023,7 @@ async function generateAIQuestions(){
   const lecture=document.getElementById('genLecture').value.trim();
   const difficulty=document.getElementById('genDifficulty').value;
   const thinkingLevel=document.getElementById('genThinking')?.value||'Higher-order thinking';
-  const count=Math.max(1,Math.min(30,Number(document.getElementById('genCount').value)||5));
+  const count=Math.max(1,Math.min(50,Number(document.getElementById('genCount').value)||5));
   const sourceType=document.getElementById('genSourceType').value;
   const sourcePool=getAIGeneratorPool();
 
@@ -2064,10 +2098,13 @@ Rules:
     if(errors.length) throw new Error('Gemini returned a malformed question: '+errors[0]);
     if(stamped.length<count) throw new Error(`Gemini returned ${stamped.length} questions instead of ${count}. Please try again.`);
 
-    aiQuestions.push(...stamped);
+    const unique=uniqueAIQuestions(stamped);
+    const duplicates=stamped.length-unique.length;
+    if(!unique.length) throw new Error('All generated questions were duplicates of existing questions. Try a different lecture, difficulty or source.');
+    aiQuestions.push(...unique);
     localStorage.setItem(CONFIG.aiQuestionsKey,JSON.stringify(aiQuestions));
 
-    if(resultBox) resultBox.innerHTML=`<div class="card" style="margin-top:14px"><div class="notice ok">Generated ${stamped.length} question${stamped.length===1?'':'s'} from ${sourceType==='website'?'your website question bank':'Gemini medical knowledge'}.</div>
+    if(resultBox) resultBox.innerHTML=`<div class="card" style="margin-top:14px"><div class="notice ok">Generated ${unique.length} new question${unique.length===1?'':'s'}${duplicates?` · ${duplicates} duplicate${duplicates===1?'':'s'} skipped`:''}.</div>
     <div class="mini" style="margin-top:8px">${esc(module+' AI generated')} · ${esc(subject)} · ${esc(lecture)}</div>
     <div style="margin-top:12px">${stamped.map(q=>aiQuestionPreviewCard(q)).join('')}</div>
     <div class="actions" style="margin-top:12px"><button class="btn primary" onclick="go('aiquestions')">Review in AI Questions</button></div></div>`;
@@ -2142,18 +2179,62 @@ function renderAIQuestions(){
 function renderAIQuestionRow(q){
   const diffClass=(q.difficulty||'').toLowerCase();
   const inBank=bank.some(b=>b.id===q.id);
-  return `<div class="category-card">
+  const editId='ai_edit_'+String(q.id).replace(/[^a-zA-Z0-9_-]/g,'_');
+  return `<div class="category-card" id="${attrJs(editId)}">
     <div class="category-head"><b>${esc(q.id)}</b>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         ${q.difficulty?`<span class="diff-pill ${esc(diffClass)}">${esc(q.difficulty)}</span>`:''}
         ${inBank?'<span class="pill">In bank</span>':`<button class="btn" onclick="addAIQuestionToBank('${attrJs(q.id)}')">Add to bank</button>`}
+        <button class="btn" onclick="toggleAIQuestionEditor('${attrJs(q.id)}')">Edit</button>
         <button class="btn danger" onclick="removeAIQuestion('${attrJs(q.id)}')">Delete</button>
       </div>
     </div>
     <div class="mini" style="margin-top:6px">${esc(q.module)} · ${esc(q.subject)} · ${esc(q.lecture)}${q.reference?` · Source: ${esc(q.reference)}`:''}</div>
-    <div style="margin-top:8px">${esc(q.question)}</div>
-    <div class="mini" style="margin-top:8px">Correct answer: <b>${esc(q.options[q.correctIndex]||'')}</b></div>
+    <div style="margin-top:8px"><b>${esc(q.question)}</b></div>
+    <div class="mini" style="margin-top:8px">A. ${esc(q.options[0]||'')} · B. ${esc(q.options[1]||'')} · C. ${esc(q.options[2]||'')} · D. ${esc(q.options[3]||'')}</div>
+    <div class="mini" style="margin-top:6px">Correct answer: <b>${String.fromCharCode(65+(q.correctIndex||0))}. ${esc(q.options[q.correctIndex]||'')}</b></div>
+    <div id="${attrJs(editId)}_editor" class="ai-edit hidden">
+      <div class="field"><label>Question</label><textarea id="${attrJs(editId)}_question">${esc(q.question)}</textarea></div>
+      <div class="grid two" style="margin-top:8px">
+        ${q.options.map((o,i)=>`<div class="field"><label>Option ${String.fromCharCode(65+i)}</label><input id="${attrJs(editId)}_o${i}" value="${esc(o)}"></div>`).join('')}
+      </div>
+      <div class="grid two" style="margin-top:8px">
+        <div class="field"><label>Correct answer</label><select id="${attrJs(editId)}_correct">${q.options.map((o,i)=>`<option value="${i}" ${i===q.correctIndex?'selected':''}>${String.fromCharCode(65+i)}</option>`).join('')}</select></div>
+        <div class="field"><label>Difficulty</label><select id="${attrJs(editId)}_difficulty">${['Easy','Medium','Hard','Mixed'].map(d=>`<option ${d.toLowerCase()===(q.difficulty||'').toLowerCase()?'selected':''}>${d}</option>`).join('')}</select></div>
+      </div>
+      <div class="field" style="margin-top:8px"><label>Explanation</label><textarea id="${attrJs(editId)}_explanation">${esc(q.explanation||'')}</textarea></div>
+      <div class="actions" style="margin-top:10px"><button class="btn primary" onclick="saveAIQuestionEdit('${attrJs(q.id)}')">Save changes</button><button class="btn" onclick="toggleAIQuestionEditor('${attrJs(q.id)}')">Cancel</button></div>
+    </div>
   </div>`;
+}
+function toggleAIQuestionEditor(id){
+  const editId='ai_edit_'+String(id).replace(/[^a-zA-Z0-9_-]/g,'_')+'_editor';
+  const el=document.getElementById(editId); if(el) el.classList.toggle('hidden');
+}
+function saveAIQuestionEdit(id){
+  const q=aiQuestions.find(x=>x.id===id); if(!q)return;
+  const editId='ai_edit_'+String(id).replace(/[^a-zA-Z0-9_-]/g,'_');
+  const updated={...q,
+    question:document.getElementById(editId+'_question').value.trim(),
+    options:[0,1,2,3].map(i=>document.getElementById(editId+'_o'+i).value.trim()),
+    correctIndex:Number(document.getElementById(editId+'_correct').value),
+    difficulty:document.getElementById(editId+'_difficulty').value,
+    explanation:document.getElementById(editId+'_explanation').value.trim()
+  };
+  const normalized=normalizeQuestion(updated,'AI generated');
+  const err=validateQuestion(normalized,0);
+  if(err){toast('Cannot save edit: '+err,'error');return;}
+  const others=aiQuestions.filter(x=>x.id!==id).concat(bank.filter(x=>x.id!==id));
+  if(isDuplicateAIQuestion(normalized,others)){toast('This edit creates a duplicate question. Change the wording before saving.','error');return;}
+  aiQuestions=aiQuestions.map(x=>x.id===id?normalized:x);
+  // Keep a bank copy synchronized if this AI question was already added there.
+  bank=bank.map(x=>x.id===id?normalized:x);
+  localQuestions=localQuestions.map(x=>x.id===id?normalized:x);
+  localStorage.setItem(CONFIG.aiQuestionsKey,JSON.stringify(aiQuestions));
+  localStorage.setItem(CONFIG.localQuestionsKey,JSON.stringify(localQuestions));
+  localStorage.setItem(CONFIG.cacheKey,JSON.stringify({updatedAt:new Date().toISOString(),sourceFiles,bank}));
+  renderAIQuestions();
+  toast('AI question updated.','ok');
 }
 function addAIQuestionToBank(id){
   const q=aiQuestions.find(x=>x.id===id);
@@ -2168,7 +2249,7 @@ function addAIQuestionToBank(id){
 }
 function addAllAIQuestionsToBank(){
   const existing=new Set(bank.map(q=>q.id));
-  const toAdd=aiQuestions.filter(q=>!existing.has(q.id));
+  const toAdd=uniqueAIQuestions(aiQuestions.filter(q=>!existing.has(q.id)));
   if(!toAdd.length){toast('All AI questions are already in the bank.','error');return;}
   localQuestions.push(...toAdd);
   bank.push(...toAdd);
