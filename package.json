@@ -1,6 +1,13 @@
 {
-  "private": true,
+  "name": "medex-platform",
+  "version": "1.0.0",
+  "description": "MedEx platform with integrated AI API proxies and Vercel Analytics",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "vercel build"
+  },
   "dependencies": {
-    "@supabase/supabase-js": "^2.57.0"
+    "@vercel/postgres": "^0.8.0"
   }
 }
