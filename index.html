@@ -221,7 +221,6 @@ h1,h2,h3{font-family:var(--font-serif);font-weight:600;letter-spacing:-.01em;mar
       <button data-view="progress"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="2.5,15 7,9.5 10.5,12.5 17.5,4"/><polyline points="12.5,4 17.5,4 17.5,9"/></svg><span>Progress & Accuracy</span></button>
       <button data-view="history"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10.5" r="7.5"/><polyline points="10,6 10,10.5 13.2,12.6"/><polyline points="3.5,2 3.5,5 6.5,5"/></svg><span>Exam History</span></button>
       <button data-view="mistakes"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.5"/><line x1="7.3" y1="7.3" x2="12.7" y2="12.7"/><line x1="12.7" y1="7.3" x2="7.3" y2="12.7"/></svg><span>Mistakes</span></button>
-      <button data-view="study"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3.5h9.5A2.5 2.5 0 0 1 16 6v10.5H6.5A2.5 2.5 0 0 0 4 19V3.5Z"/><path d="M4 16.5h9.5"/><path d="M7 7h6M7 10h6M7 13h4"/></svg><span>Study Mode</span></button>
       <button data-view="weak"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,14 7,10 10,12 17,5"/><polyline points="13,5 17,5 17,9"/></svg><span>Weak Topics</span></button>
       <button data-view="favorites"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linejoin="round"><path d="M10 16.8 3.6 10.4A4.1 4.1 0 0 1 9.4 4.6L10 5.2l.6-.6a4.1 4.1 0 0 1 5.8 5.8L10 16.8Z"/></svg><span>Favorites</span></button>
       <button data-view="bank" id="bankNav"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polygon points="10,2 18,6.5 10,11 2,6.5"/><polyline points="2,10.5 10,15 18,10.5"/><polyline points="2,14.5 10,19 18,14.5"/></svg><span>Question Bank</span></button>
@@ -280,7 +279,6 @@ const CONFIG = {
   aiQuestionsKey: 'med64_ai_questions_v1',
   aiChatKey: 'med64_ai_chat_v1',
   favoritesKey: 'med64_favorites_v1',
-  studyKey: 'med64_study_v1'
 };
 
 const DEFAULT_SETTINGS = {
@@ -310,7 +308,6 @@ let exam = null;
 let timerId = null;
 let lastSync = null;
 let favorites = new Set(loadJSON(CONFIG.favoritesKey, []));
-let studySession = null;
 let currentUser = null;
 let remoteHistory = [];
 let globalAnalytics = {modules:[], lectures:[], students:0, submittedExams:0, averageScore:0};
@@ -463,7 +460,7 @@ async function saveExamToSupabase(result){
     unanswered:result.unanswered,
     accuracy:result.accuracy,
     duration_seconds:result.durationSec,
-    exam_data:{list:result.list,answers:result.answers,auto:!!result.auto}
+    exam_data:{list:result.list,answers:result.answers,auto:!!result.auto,blueprint:result.blueprint||null}
   });
   if(error)console.warn('Exam sync failed:',error.message);
 }
@@ -752,7 +749,7 @@ function layout(title,subtitle,body,actions=''){
 function render(){
   updateSidebarFoot();
   const view=location.hash.replace('#','')||'dashboard';
-  const allowed=['dashboard','exam','progress','history','mistakes','study','weak','favorites','bank','import','ai','aiquestions','settings','account','results'];
+  const allowed=['dashboard','exam','progress','history','mistakes','weak','favorites','bank','import','ai','aiquestions','settings','account','results'];
   const v=allowed.includes(view)?view:'dashboard';
   document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
   const adminNav=document.getElementById('adminNav'); if(adminNav) adminNav.style.display=isAdmin?'flex':'none';
@@ -763,7 +760,6 @@ function render(){
   else if(v==='progress') renderProgress();
   else if(v==='history') renderHistory();
   else if(v==='mistakes') renderMistakes();
-  else if(v==='study') renderStudyMode();
   else if(v==='weak') renderWeakTopics();
   else if(v==='favorites') renderFavorites();
   else if(v==='bank') renderBank();
@@ -815,7 +811,7 @@ function renderDashboard(){
     <div class="bar"><i style="width:${progressFor(list)}%"></i></div>
     <div class="mini" style="margin-top:8px">${practicedCount(list)} of ${list.length} practiced</div></div>`;
   }).join('') || '<div class="card empty">No questions loaded yet.</div>'}</div>
-  <div class="actions" style="margin:16px 0"><button class="btn primary" onclick="go('study')">Study Mode</button><button class="btn" onclick="go('weak')">Weak Topics</button><button class="btn" onclick="go('favorites')">Favorites</button></div>
+  <div class="actions" style="margin:16px 0"><button class="btn" onclick="go('weak')">Weak Topics</button><button class="btn" onclick="go('favorites')">Favorites</button></div>
   <h2 class="section-title">Recent exams</h2>
   <div class="card">${renderRecentExamsList(3)}
     <div class="actions" style="margin-top:12px"><button class="btn" onclick="go('history')">View full history</button></div>
@@ -828,6 +824,25 @@ function renderDashboard(){
   document.getElementById('app').innerHTML=layout('Dashboard','Your personal progress is stored in this browser.',body);
 }
 
+function difficultyOf(q){
+  const d=String(q.difficulty||'').trim().toLowerCase();
+  if(d==='easy')return 'Easy'; if(d==='medium')return 'Medium'; if(d==='hard')return 'Hard'; return 'Unrated';
+}
+function buildBlueprintHtml(list){
+  const total=list.length||0;
+  if(!total)return 'No questions available.';
+  const subjects={};
+  list.forEach(q=>{subjects[q.subject]=(subjects[q.subject]||0)+1;});
+  const diffs=['Easy','Medium','Hard','Unrated'].map(d=>[d,list.filter(q=>difficultyOf(q)===d).length]);
+  return `<div><b>${total.toLocaleString()} questions available</b></div><div style="margin-top:8px">Subjects: ${Object.entries(subjects).sort((a,b)=>b[1]-a[1]).slice(0,12).map(([k,v])=>`${esc(k)} (${v})`).join(' · ')}</div><div style="margin-top:6px">Difficulty: ${diffs.map(([d,n])=>`${d} ${n}`).join(' · ')}</div>`;
+}
+function updateExamBlueprint(){
+  const m=document.getElementById('examModule')?.value||'', s=document.getElementById('examSubject')?.value||'', l=document.getElementById('examLecture')?.value||'';
+  const d=document.getElementById('examDifficulty')?.value||'';
+  const list=bank.filter(q=>(!m||q.module===m)&&(!s||q.subject===s)&&(!l||q.lecture===l)&&(!d||difficultyOf(q)===d));
+  const el=document.getElementById('examBlueprint'); if(el)el.innerHTML=buildBlueprintHtml(list);
+}
+
 function renderExamSetup(){
   const modules=getModules();
   const body=`
@@ -836,8 +851,10 @@ function renderExamSetup(){
       <div class="field"><label>Module</label><select id="examModule" onchange="updateExamSubjects()"><option value="">All modules</option>${modules.map(m=>`<option>${esc(m)}</option>`).join('')}</select></div>
       <div class="field"><label>Subject</label><select id="examSubject" onchange="updateExamLectures()"><option value="">All subjects</option>${getSubjects().map(s=>`<option>${esc(s)}</option>`).join('')}</select></div>
       <div class="field"><label>Lecture</label><select id="examLecture"><option value="">All lectures</option>${getLectures().map(l=>`<option>${esc(l)}</option>`).join('')}</select></div>
-      <div class="field"><label>Number of questions</label><input id="examCount" type="number" min="1" value="${Math.min(20,bank.length||1)}"></div>
+      <div class="field"><label>Number of questions</label><input id="examCount" type="number" min="1" max="500" value="${Math.min(20,bank.length||1)}"></div>
       <div class="field"><label>Time limit (minutes, 0 = unlimited)</label><input id="examMinutes" type="number" min="0" value="0"></div>
+      <div class="field"><label>Difficulty</label><select id="examDifficulty" onchange="updateExamBlueprint()"><option value="">All difficulties</option><option value="Easy">Easy</option><option value="Medium">Medium</option><option value="Hard">Hard</option><option value="Unrated">Unrated</option></select></div>
+      <div class="field"><label>Question order</label><select id="examRandomMode"><option value="random">Fully random</option><option value="balanced">Balanced by subject</option></select></div>
       <div class="field"><label>Answer display</label><select id="answerMode">
         <option value="immediate" ${settings.showAnswerImmediately?'selected':''}>Show answer immediately after selection</option>
         <option value="finish" ${!settings.showAnswerImmediately?'selected':''}>Show answers after finishing</option>
@@ -846,6 +863,10 @@ function renderExamSetup(){
     <div style="margin-top:14px" class="actions">
       <button class="btn primary" onclick="startExam()">Start Exam</button>
       <button class="btn" onclick="go('mistakes')">Practice Mistakes</button>
+    </div>
+    <div class="card" style="margin-top:16px;background:var(--bg)">
+      <div class="category-head"><strong>Exam blueprint</strong><span class="mini">The exam will be built from the selected filters.</span></div>
+      <div id="examBlueprint" class="mini" style="margin-top:10px">${buildBlueprintHtml(bank)}</div>
     </div>
   </div>
   <div class="card" style="margin-top:16px">
@@ -858,12 +879,15 @@ function updateExamSubjects(){
   const m=document.getElementById('examModule').value;
   document.getElementById('examSubject').innerHTML='<option value="">All subjects</option>'+getSubjects(m).map(s=>`<option>${esc(s)}</option>`).join('');
   updateExamLectures();
+  updateExamBlueprint();
 }
 function updateExamLectures(){
   const m=document.getElementById('examModule').value;
   const s=document.getElementById('examSubject').value;
   document.getElementById('examLecture').innerHTML='<option value="">All lectures</option>'+getLectures(m,s).map(l=>`<option>${esc(l)}</option>`).join('');
+  updateExamBlueprint();
 }
+
 function startExam(customList=null, overrides=null, customLabel=null){
   if(!customList && !bank.length){toast('No questions are loaded. Refresh from GitHub first.','error');return;}
   if(customList && !customList.length){toast('No questions to practice.','error');return;}
@@ -871,7 +895,7 @@ function startExam(customList=null, overrides=null, customLabel=null){
   let list=customList||[...bank];
   let answerMode=settings.showAnswerImmediately?'immediate':'finish';
   let label=customLabel||'Random review', moduleFilter='', subjectFilter='', lectureFilter='';
-  let minutesValue=0;
+  let minutesValue=0, difficultyFilter='', randomMode='random';
 
   if(customList){
     label=customLabel||'Mistakes practice';
@@ -886,6 +910,8 @@ function startExam(customList=null, overrides=null, customLabel=null){
       n=Math.max(1,Number(overrides.count)||20);
       answerMode=overrides.answerMode||answerMode;
       minutesValue=Number(overrides.minutes)||0;
+      difficultyFilter=overrides.difficulty||'';
+      randomMode=overrides.randomMode||'random';
     } else {
       m=document.getElementById('examModule').value;
       s=document.getElementById('examSubject').value;
@@ -893,6 +919,8 @@ function startExam(customList=null, overrides=null, customLabel=null){
       n=Math.max(1,Number(document.getElementById('examCount').value)||1);
       answerMode=document.getElementById('answerMode').value;
       minutesValue=Number(document.getElementById('examMinutes').value)||0;
+      difficultyFilter=document.getElementById('examDifficulty').value||'';
+      randomMode=document.getElementById('examRandomMode').value||'random';
     }
 
     moduleFilter=m;
@@ -902,7 +930,8 @@ function startExam(customList=null, overrides=null, customLabel=null){
     list=list.filter(q=>
       (!m||q.module===m)&&
       (!s||q.subject===s)&&
-      (!l||q.lecture===l)
+      (!l||q.lecture===l)&&
+      (!difficultyFilter||difficultyOf(q)===difficultyFilter)
     );
 
     if(!list.length){
@@ -922,12 +951,18 @@ function startExam(customList=null, overrides=null, customLabel=null){
       return !p || p.last!=='correct';
     });
 
+    const recentIds=new Set(loadJSON('med64_recent_exam_questions_v1',[]));
+    const fresh=eligible.filter(q=>!recentIds.has(key(q)));
+    const pool=fresh.length>=Math.min(n,eligible.length)?fresh:eligible;
+
     if(!eligible.length){
       toast('All questions in this selection have been answered correctly. Reset progress to practice them again.','ok');
       return;
     }
 
-    list=shuffle([...eligible]).slice(0,Math.min(n,eligible.length));
+    if(randomMode==='balanced') list=balancedSelect(pool,n);
+    else list=shuffle([...pool]).slice(0,Math.min(n,pool.length));
+    localStorage.setItem('med64_recent_exam_questions_v1', JSON.stringify(list.map(key).slice(0,1000)));
 
     // Always randomize answer order for every exam.
     list=list.map(q=>{
@@ -966,11 +1001,22 @@ function startExam(customList=null, overrides=null, customLabel=null){
     label,
     moduleFilter,
     subjectFilter,
-    lectureFilter
+    lectureFilter,
+    difficultyFilter,
+    randomMode,
+    blueprint:{total:list.length,module:moduleFilter,subject:subjectFilter,lecture:lectureFilter,difficulty:difficultyFilter}
   };
 
   if(exam.minutes>0) startTimer(exam.minutes*60);
   renderQuiz();
+}
+function balancedSelect(list,n){
+  if(!list.length)return [];
+  const groups=new Map();
+  list.forEach(q=>{const k=q.subject||'Unspecified'; if(!groups.has(k))groups.set(k,[]); groups.get(k).push(q);});
+  const buckets=[...groups.values()].map(a=>shuffle([...a]));
+  const out=[]; let i=0; while(out.length<Math.min(n,list.length)){ const b=buckets[i%buckets.length]; if(b.length)out.push(b.pop()); i++; if(i>100000)break; }
+  return out;
 }
 function startModuleExam(module){
   startExam(null,{module,count:20});
@@ -1008,7 +1054,7 @@ function renderQuiz(){
   const remaining=exam.minutes?Math.max(0,exam.minutes*60-Math.floor((Date.now()-exam.started)/1000)):0;
   const answeredCount=exam.list.filter(item=>exam.answers[item.id]!==undefined).length;
   const body=`<div class="quiz"><div class="card">
-    <div class="qhead"><span class="pill">${exam.index+1} / ${exam.list.length}</span><span class="mini">${esc(q.module)} · ${esc(q.subject)} · ${esc(q.lecture)}</span><button type="button" class="btn" style="margin-left:auto" onclick="toggleFavorite('${attrJs(q.id)}')">${isFavorite(q)?'★':'☆'}</button>${exam.minutes?`<span class="timer" id="timer">${formatTime(remaining)}</span>`:''}</div>
+    <div class="qhead"><span class="pill">${exam.index+1} / ${exam.list.length}</span><span class="mini">${esc(q.module)} · ${esc(q.subject)} · ${esc(q.lecture)}</span><button type="button" class="btn" style="margin-left:auto" onclick="event.preventDefault();event.stopPropagation();toggleFavorite('${attrJs(q.id)}')">${isFavorite(q)?'★':'☆'}</button>${exam.minutes?`<span class="timer" id="timer">${formatTime(remaining)}</span>`:''}</div>
     <div class="bar"><i style="width:${pct(exam.index,exam.list.length-1)}%"></i></div>
     <div class="question-nav" aria-label="Question navigation">
       <div style="width:100%;display:flex;justify-content:space-between;align-items:center">
@@ -1023,7 +1069,7 @@ function renderQuiz(){
     </div>
     <div class="question">${esc(q.question)}</div>
     <div class="options">${opts}</div>
-    <div class="quiz-footer"><button class="btn" onclick="prevQ()" ${exam.index===0?'disabled':''}>Previous</button>
+    <div class="quiz-footer"><button class="btn" onclick="reviewExam()">Review Exam</button><button class="btn" onclick="prevQ()" ${exam.index===0?'disabled':''}>Previous</button>
     <button class="btn primary" onclick="${exam.index===exam.list.length-1?'submitExam(false)':'nextQ()'}">${exam.index===exam.list.length-1?'Submit Exam':'Next'}</button></div>
   </div></div>`;
   document.getElementById('app').innerHTML=layout('Exam','Use the numbered buttons to move between questions. Answered questions turn green.',body);
@@ -1032,6 +1078,14 @@ function jumpToQuestion(i){
   if(!exam||exam.submitted||i<0||i>=exam.list.length)return;
   exam.index=i;
   renderQuiz();
+}
+function reviewExam(){
+  if(!exam)return;
+  const unanswered=exam.list.filter(q=>exam.answers[q.id]===undefined).length;
+  const answered=exam.list.length-unanswered;
+  const rows=exam.list.map((q,i)=>{const a=exam.answers[q.id]; const state=a===undefined?'Unanswered':a===q.correctIndex?'Correct':'Answered'; return `<div class="progress-row" style="grid-template-columns:55px 1fr 110px"><b>${i+1}</b><span>${esc(q.subject)} · ${esc(q.lecture)}</span><span class="pill">${state}</span></div>`;}).join('');
+  const body=`<div class="card"><div class="grid stats"><div class="card stat"><div class="label">Questions</div><div class="value">${exam.list.length}</div></div><div class="card stat"><div class="label">Answered</div><div class="value">${answered}</div></div><div class="card stat"><div class="label">Unanswered</div><div class="value">${unanswered}</div></div></div><div style="margin-top:14px">${rows}</div><div class="actions" style="margin-top:14px"><button class="btn" onclick="renderQuiz()">Back to Exam</button><button class="btn primary" onclick="submitExam(false)">Submit Exam</button></div></div>`;
+  document.getElementById('app').innerHTML=layout('Review Exam','Check answered and unanswered questions before submitting.',body);
 }
 function chooseAnswer(i){
   if(!exam||exam.submitted)return;
@@ -1090,7 +1144,8 @@ async function submitExam(auto){
     durationSec,
     list:exam.list,
     answers:exam.answers,
-    auto
+    auto,
+    blueprint:exam.blueprint||null
   };
 
   if(SUPABASE_ENABLED && currentUser){
@@ -1169,27 +1224,27 @@ async function submitAuth(mode){
 function renderResults(){
   const r=loadJSON(CONFIG.lastResultKey,null);
   if(!r){go('dashboard');return;}
+  const answered=r.answered||0;
+  const total=r.total||r.list.length;
+  const timePer=answered?Math.round((r.durationSec||0)/answered):0;
+  const bySubject={}; const byDifficulty={};
+  r.list.forEach(q=>{
+    const a=r.answers[q.id]; const ok=a===q.correctIndex;
+    const sk=q.subject||'Unspecified'; const dk=difficultyOf(q);
+    for(const [obj,k] of [[bySubject,sk],[byDifficulty,dk]]){ if(!obj[k])obj[k]={total:0,answered:0,correct:0}; obj[k].total++; if(a!==undefined){obj[k].answered++; if(ok)obj[k].correct++;} }
+  });
+  const analysis=(obj)=>Object.entries(obj).sort((a,b)=>(b[1].total-a[1].total)).map(([k,x])=>`<div class="progress-row" style="grid-template-columns:1fr 90px 100px"><span><b>${esc(k)}</b><div class="mini">${x.answered}/${x.total} answered</div></span><span>${x.correct}/${x.answered||0}</span><span class="pill">${x.answered?Math.round(x.correct/x.answered*100):0}%</span></div>`).join('')||'<div class="empty">No breakdown available.</div>';
   const rows=r.list.map((q,i)=>{
     const a=r.answers[q.id], ok=a===q.correctIndex;
-    const choices=q.options.map((o,j)=>{
-      let cls='review-choice';
-      if(j===q.correctIndex) cls+=' correct';
-      if(j===a && j!==q.correctIndex) cls+=' wrong';
-      if(j===a) cls+=' selected';
-      const tag=j===q.correctIndex?' — Correct answer':j===a?' — Your answer':'';
-      return `<div class="${cls}"><b>${String.fromCharCode(65+j)}.</b> ${esc(o)}<span class="mini">${tag}</span></div>`;
-    }).join('');
-    return `<div class="category-card" style="margin-bottom:14px">
-      <div><b>${i+1}. ${esc(q.question)}</b></div>
-      <div class="mini" style="margin-top:6px">${esc(q.module)} · ${esc(q.subject)} · ${esc(q.lecture)}</div>
-      <div style="margin-top:12px">${choices}</div>
-      <div class="review ${a===undefined?'bad':ok?'good':'bad'}">${a===undefined?'Unanswered':ok?'Correct':'Incorrect'} · Your answer: ${a===undefined?'—':esc(q.options[a])}<br>Correct answer: <b>${esc(q.options[q.correctIndex])}</b>${q.explanation?`<br>${esc(q.explanation)}`:''}</div>
-    </div>`;
+    const choices=q.options.map((o,j)=>{let cls='review-choice';if(j===q.correctIndex)cls+=' correct';if(j===a&&j!==q.correctIndex)cls+=' wrong';if(j===a)cls+=' selected';const tag=j===q.correctIndex?' — Correct answer':j===a?' — Your answer':'';return `<div class="${cls}"><b>${String.fromCharCode(65+j)}.</b> ${esc(o)}<span class="mini">${tag}</span></div>`;}).join('');
+    return `<div class="category-card" style="margin-bottom:14px"><div><b>${i+1}. ${esc(q.question)}</b></div><div class="mini" style="margin-top:6px">${esc(q.module)} · ${esc(q.subject)} · ${esc(q.lecture)} · ${esc(difficultyOf(q))}</div><div style="margin-top:12px">${choices}</div><div class="review ${a===undefined?'bad':ok?'good':'bad'}">${a===undefined?'Unanswered':ok?'Correct':'Incorrect'} · Your answer: ${a===undefined?'—':esc(q.options[a])}<br>Correct answer: <b>${esc(q.options[q.correctIndex])}</b>${q.explanation?`<br>${esc(q.explanation)}`:''}</div></div>`;
   }).join('');
+  const blueprint=r.blueprint?`${esc(r.blueprint.module||'All modules')} · ${esc(r.blueprint.subject||'All subjects')} · ${esc(r.blueprint.lecture||'All lectures')}${r.blueprint.difficulty?' · '+esc(r.blueprint.difficulty):''}`:'Not specified';
   const meta=`<div class="mini">${esc(r.label||'Exam')} · ${r.date?new Date(r.date).toLocaleString():''}${r.durationSec?' · '+formatTime(r.durationSec)+' taken':''}</div>`;
-  const body=`${meta}
-  <div class="grid stats" style="margin-top:10px"><div class="card stat"><div class="label">Score</div><div class="value">${r.correct}/${r.total}</div></div><div class="card stat"><div class="label">Accuracy</div><div class="value">${r.accuracy}%</div></div><div class="card stat"><div class="label">Answered</div><div class="value">${r.answered}</div></div><div class="card stat"><div class="label">Unanswered</div><div class="value">${r.unanswered}</div></div></div>
-  <h2 class="section-title">Full review</h2><div>${rows}</div><div class="actions" style="margin-top:14px"><button class="btn primary" onclick="go('exam')">New Exam</button><button class="btn" onclick="go('history')">Exam History</button><button class="btn" onclick="go('progress')">View Progress</button></div>`;
+  const body=`${meta}<div class="grid stats" style="margin-top:10px"><div class="card stat"><div class="label">Score</div><div class="value">${r.correct}/${r.total}</div></div><div class="card stat"><div class="label">Accuracy</div><div class="value">${r.accuracy}%</div></div><div class="card stat"><div class="label">Time / answered</div><div class="value">${formatTime(timePer)}</div></div><div class="card stat"><div class="label">Unanswered</div><div class="value">${r.unanswered}</div></div><div class="card stat"><div class="label">Wrong</div><div class="value">${Math.max(0,r.answered-r.correct)}</div></div></div>
+  <div class="card" style="margin-top:16px"><div class="category-head"><strong>Exam blueprint</strong><span class="pill">${r.total} questions</span></div><div class="mini" style="margin-top:8px">${blueprint}</div></div>
+  <div class="grid two" style="margin-top:16px"><div class="card"><h2 class="section-title">By subject</h2>${analysis(bySubject)}</div><div class="card"><h2 class="section-title">By difficulty</h2>${analysis(byDifficulty)}</div></div>
+  <h2 class="section-title">Review Exam</h2><div>${rows}</div><div class="actions" style="margin-top:14px"><button class="btn primary" onclick="go('exam')">New Exam</button><button class="btn" onclick="go('history')">Exam History</button><button class="btn" onclick="go('progress')">View Progress</button></div>`;
   document.getElementById('app').innerHTML=layout('Exam Results',r.auto?'Time expired — exam submitted automatically.':'Exam completed.',body);
 }
 
@@ -1251,12 +1306,10 @@ function renderMistakes(){
 
 function isFavorite(q){ return favorites.has(key(q)); }
 function toggleFavorite(id){
+  if(!id)return;
   if(favorites.has(id)) favorites.delete(id); else favorites.add(id);
-  saveState();
-  // Do not route away from an active exam/study session. Re-render only the
-  // current question so the timer, answers, position and session stay intact.
+  localStorage.setItem(CONFIG.favoritesKey, JSON.stringify([...favorites]));
   if(exam && !exam.submitted){ renderQuiz(); return; }
-  if(studySession){ renderStudyQuestion(); return; }
   render();
 }
 function progressRecord(q){
@@ -1267,13 +1320,6 @@ function isDue(q){
   const p=progress[key(q)];
   if(!p || !p.nextReview) return true;
   return new Date(p.nextReview).getTime() <= Date.now();
-}
-function reviewLabel(q){
-  const p=progress[key(q)];
-  if(!p || !p.nextReview) return 'New';
-  const t=new Date(p.nextReview).getTime();
-  if(t<=Date.now()) return 'Due now';
-  return 'Review '+new Date(p.nextReview).toLocaleDateString();
 }
 function scheduleReview(q, ok){
   const p=progressRecord(q);
@@ -1299,68 +1345,6 @@ function weakTopicData(){
   });
   return [...map.values()].map(x=>({...x,accuracy:x.total?Math.round(x.correct/x.total*100):0})).sort((a,b)=>a.accuracy-b.accuracy||b.total-a.total);
 }
-function startStudyFromFilters(){
-  const m=document.getElementById('studyModule').value, s=document.getElementById('studySubject').value, l=document.getElementById('studyLecture').value;
-  const n=Math.max(1,Math.min(50,Number(document.getElementById('studyCount').value)||10));
-  let list=bank.filter(q=>(!m||q.module===m)&&(!s||q.subject===s)&&(!l||q.lecture===l));
-  if(!list.length){toast('No questions match these filters.','error');return;}
-  const due=list.filter(isDue);
-  const pool=due.length?due:list;
-  studySession={list:shuffle([...pool]).slice(0,n),index:0,answers:{},started:Date.now(),revealed:false};
-  renderStudyQuestion();
-}
-function startStudy(list,label='Study Mode'){
-  if(!list.length){toast('No questions available for this study session.','error');return;}
-  studySession={list:shuffle([...list]).slice(0,50),index:0,answers:{},started:Date.now(),revealed:false,label};
-  renderStudyQuestion();
-}
-function renderStudyMode(){
-  const modules=getModules();
-  const body=`<div class="card">
-    <div class="filters">
-      <div class="field"><label>Module</label><select id="studyModule" onchange="updateStudySubjects()"><option value="">All modules</option>${modules.map(m=>`<option>${esc(m)}</option>`).join('')}</select></div>
-      <div class="field"><label>Subject</label><select id="studySubject" onchange="updateStudyLectures()"><option value="">All subjects</option>${getSubjects().map(x=>`<option>${esc(x)}</option>`).join('')}</select></div>
-      <div class="field"><label>Lecture</label><select id="studyLecture"><option value="">All lectures</option>${getLectures().map(x=>`<option>${esc(x)}</option>`).join('')}</select></div>
-      <div class="field"><label>Questions</label><input id="studyCount" type="number" min="1" max="50" value="10"></div>
-    </div>
-    <div class="actions" style="margin-top:14px"><button class="btn primary" onclick="startStudyFromFilters()">Start Study Session</button><button class="btn" onclick="startStudy(bank.filter(isDue),'Due Reviews')">Review Due Questions</button><button class="btn" onclick="startStudy(bank.filter(q=>isFavorite(q)),'Favorites')">Study Favorites</button></div>
-  </div>
-  <div class="grid three" style="margin-top:16px">
-    <div class="card stat"><div class="label">Due for review</div><div class="value">${bank.filter(isDue).length}</div></div>
-    <div class="card stat"><div class="label">Favorites</div><div class="value">${favorites.size}</div></div>
-    <div class="card stat"><div class="label">Questions practiced</div><div class="value">${practicedCount(bank)}</div></div>
-  </div>
-  <div class="card" style="margin-top:16px"><strong>How Study Mode works</strong><p class="mini" style="margin-top:8px">Study Mode is untimed. Answer a question, see the explanation immediately, then continue. Correct answers are scheduled farther into the future; incorrect answers return sooner.</p></div>`;
-  document.getElementById('app').innerHTML=layout('Study Mode','Focused learning with explanations and spaced review.',body);
-}
-function updateStudySubjects(){
-  const m=document.getElementById('studyModule').value;
-  document.getElementById('studySubject').innerHTML='<option value="">All subjects</option>'+getSubjects(m).map(s=>`<option>${esc(s)}</option>`).join('');
-  updateStudyLectures();
-}
-function updateStudyLectures(){
-  const m=document.getElementById('studyModule').value,s=document.getElementById('studySubject').value;
-  document.getElementById('studyLecture').innerHTML='<option value="">All lectures</option>'+getLectures(m,s).map(l=>`<option>${esc(l)}</option>`).join('');
-}
-function renderStudyQuestion(){
-  if(!studySession || studySession.index>=studySession.list.length){
-    const total=studySession?.list.length||0, correct=studySession?studySession.list.filter(q=>studySession.answers[key(q)]===q.correctIndex).length:0;
-    studySession=null; saveState();
-    const body=`<div class="card"><div class="grid stats"><div class="card stat"><div class="label">Questions</div><div class="value">${total}</div></div><div class="card stat"><div class="label">Correct</div><div class="value">${correct}</div></div><div class="card stat"><div class="label">Accuracy</div><div class="value">${total?Math.round(correct/total*100):0}%</div></div></div><div class="actions"><button class="btn primary" onclick="go('study')">Study Again</button><button class="btn" onclick="go('dashboard')">Dashboard</button></div></div>`;
-    document.getElementById('app').innerHTML=layout('Study Complete','Your review session is finished.',body); return;
-  }
-  const q=studySession.list[studySession.index], chosen=studySession.answers[key(q)];
-  const answered=chosen!==undefined;
-  const opts=q.options.map((o,i)=>{let cls='option'; if(answered){if(i===q.correctIndex)cls+=' correct'; if(i===chosen&&i!==q.correctIndex)cls+=' wrong';} return `<button class="${cls}" ${answered?'disabled':''} onclick="answerStudy(${i})">${String.fromCharCode(65+i)}. ${esc(o)}</button>`}).join('');
-  const p=progress[key(q)];
-  const body=`<div class="card"><div class="qhead"><span class="pill">${studySession.index+1} / ${studySession.list.length}</span><span class="mini">${esc(q.module)} · ${esc(q.subject)} · ${esc(q.lecture)}</span><button type="button" class="btn" style="margin-left:auto" onclick="toggleFavorite('${attrJs(q.id)}')">${isFavorite(q)?'★ Favorited':'☆ Favorite'}</button></div><div class="bar"><i style="width:${pct(studySession.index,studySession.list.length-1)}%"></i></div><div class="mini" style="margin-top:8px">${reviewLabel(q)}${p?.streak?` · ${p.streak} correct streak`:''}</div><div class="question" style="margin-top:16px">${esc(q.question)}</div><div class="options">${opts}</div>${answered?`<div class="review ${chosen===q.correctIndex?'good':'bad'}"><b>${chosen===q.correctIndex?'Correct':'Incorrect'}</b><br>Correct answer: <b>${esc(q.options[q.correctIndex])}</b>${q.explanation?`<br>${esc(q.explanation)}`:'<br>No explanation provided.'}</div>`:''}<div class="quiz-footer"><button class="btn" onclick="go('study')">Exit</button>${answered?`<button class="btn primary" onclick="nextStudy()">${studySession.index===studySession.list.length-1?'Finish':'Next'}</button>`:''}</div></div>`;
-  document.getElementById('app').innerHTML=layout('Study Session','Answer first, then review the explanation.',body);
-}
-function answerStudy(i){
-  if(!studySession)return; const q=studySession.list[studySession.index], k=key(q); if(studySession.answers[k]!==undefined)return;
-  studySession.answers[k]=i; const ok=i===q.correctIndex; const p=progressRecord(q); p.attempts++; if(ok){p.correct++;p.last='correct';}else{p.wrong++;p.last='wrong';} scheduleReview(q,ok); saveState(); renderStudyQuestion();
-}
-function nextStudy(){if(!studySession)return; studySession.index++; renderStudyQuestion();}
 function renderWeakTopics(){
   const rows=weakTopicData();
   const weak=rows.filter(x=>x.total>=2);
@@ -1369,7 +1353,7 @@ function renderWeakTopics(){
 }
 function renderFavorites(){
   const list=bank.filter(q=>favorites.has(key(q)));
-  const body=`<div class="card"><div class="category-head"><strong>${list.length} favorite question${list.length===1?'':'s'}</strong><span class="mini">Favorites are stored in this browser.</span></div>${list.length?`<div style="margin-top:14px">${list.map(q=>`<div class="category-card"><div class="category-head"><b>${esc(q.question)}</b><button class="btn" onclick="toggleFavorite('${attrJs(q.id)}')">★ Remove</button></div><div class="mini">${esc(q.module)} · ${esc(q.subject)} · ${esc(q.lecture)}</div></div>`).join('')}</div><div class="actions" style="margin-top:12px"><button class="btn primary" onclick="startStudy(bank.filter(q=>favorites.has(key(q))),'Favorites')">Study Favorites</button></div>`:'<div class="empty" style="margin-top:14px">No favorites yet. Use the ☆ Favorite button during Study Mode.</div>'}</div>`;
+  const body=`<div class="card"><div class="category-head"><strong>${list.length} favorite question${list.length===1?'':'s'}</strong><span class="mini">Favorites are stored in this browser.</span></div>${list.length?`<div style="margin-top:14px">${list.map(q=>`<div class="category-card"><div class="category-head"><b>${esc(q.question)}</b><button class="btn" onclick="event.preventDefault();event.stopPropagation();toggleFavorite('${attrJs(q.id)}')">★ Remove</button></div><div class="mini">${esc(q.module)} · ${esc(q.subject)} · ${esc(q.lecture)}</div></div>`).join('')}</div><div class="actions" style="margin-top:12px"><button class="btn primary" onclick="startExam(bank.filter(q=>favorites.has(key(q))),null,'Favorite questions')">Practice Favorites</button></div>`:'<div class="empty" style="margin-top:14px">No favorites yet. Use the ☆ Favorite button during an exam.</div>'}</div>`;
   document.getElementById('app').innerHTML=layout('Favorites','Save high-yield questions for quick review.',body);
 }
 
@@ -1770,7 +1754,6 @@ function renderSettings(){
     </p>
   </div>
   <div class="actions" style="margin-top:16px"><button class="btn primary" onclick="saveSettings()">Save settings</button><button class="btn" onclick="exportProgress()">Export my progress</button>${isAdmin ? '<button class="btn" onclick="exportBank()">Export current bank</button>' : ''}<button class="btn" onclick="exportHistory()">Export exam history</button><button class="btn danger" onclick="clearHistory()">Clear exam history</button></div></div>
-  <div class="card" style="margin-top:16px"><h3 style="margin-top:0">Phase 2 study features</h3><p class="mini">Study Mode, favorites, weak-topic analysis and spaced review are stored locally in this browser. Correct answers are scheduled at 1, 3, 7, 14 and 30 day intervals; incorrect answers return the next day.</p></div>
   <div class="card" style="margin-top:16px"><h3 style="margin-top:0">About storage</h3><p class="mini">The question bank is loaded from Supabase when connected, with GitHub as fallback. Signed-in student progress and exam history are stored in Supabase and follow the account across devices. AI questions and chat history are also stored only in this browser. AI requests are relayed through this site's own server-side function — no personal API key is ever stored in or sent from your browser.</p></div>`;
   document.getElementById('app').innerHTML=layout('Settings','Personal browser settings and backups.',body);
 }
