@@ -215,6 +215,9 @@ h1,h2,h3{font-family:var(--font-serif);font-weight:600;letter-spacing:-.01em;mar
       <button data-view="progress"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="2.5,15 7,9.5 10.5,12.5 17.5,4"/><polyline points="12.5,4 17.5,4 17.5,9"/></svg><span>Progress & Accuracy</span></button>
       <button data-view="history"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10.5" r="7.5"/><polyline points="10,6 10,10.5 13.2,12.6"/><polyline points="3.5,2 3.5,5 6.5,5"/></svg><span>Exam History</span></button>
       <button data-view="mistakes"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.5"/><line x1="7.3" y1="7.3" x2="12.7" y2="12.7"/><line x1="12.7" y1="7.3" x2="7.3" y2="12.7"/></svg><span>Mistakes</span></button>
+      <button data-view="study"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3.5h9.5A2.5 2.5 0 0 1 16 6v10.5H6.5A2.5 2.5 0 0 0 4 19V3.5Z"/><path d="M4 16.5h9.5"/><path d="M7 7h6M7 10h6M7 13h4"/></svg><span>Study Mode</span></button>
+      <button data-view="weak"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,14 7,10 10,12 17,5"/><polyline points="13,5 17,5 17,9"/></svg><span>Weak Topics</span></button>
+      <button data-view="favorites"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linejoin="round"><path d="M10 16.8 3.6 10.4A4.1 4.1 0 0 1 9.4 4.6L10 5.2l.6-.6a4.1 4.1 0 0 1 5.8 5.8L10 16.8Z"/></svg><span>Favorites</span></button>
       <button data-view="bank" id="bankNav"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polygon points="10,2 18,6.5 10,11 2,6.5"/><polyline points="2,10.5 10,15 18,10.5"/><polyline points="2,14.5 10,19 18,14.5"/></svg><span>Question Bank</span></button>
       <button data-view="import" id="adminNav" style="display:none"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13V2.5"/><polyline points="6,6.5 10,2.5 14,6.5"/><path d="M3 13v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg><span>Upload / Update Questions</span></button>
       <button data-view="ai"><svg viewBox="0 0 20 20" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2.5 L11.6 7.2 L16.2 8.8 L11.6 10.4 L10 15.1 L8.4 10.4 L3.8 8.8 L8.4 7.2 Z"/><path d="M16 2.5 L16.7 4.4 L18.6 5.1 L16.7 5.8 L16 7.7 L15.3 5.8 L13.4 5.1 L15.3 4.4 Z"/></svg><span>AI Assistant</span></button>
@@ -269,7 +272,9 @@ const CONFIG = {
   localQuestionsKey: 'med64_local_questions_v1',
   aiSettingsKey: 'med64_ai_settings_v1',
   aiQuestionsKey: 'med64_ai_questions_v1',
-  aiChatKey: 'med64_ai_chat_v1'
+  aiChatKey: 'med64_ai_chat_v1',
+  favoritesKey: 'med64_favorites_v1',
+  studyKey: 'med64_study_v1'
 };
 
 const DEFAULT_SETTINGS = {
@@ -282,8 +287,7 @@ const DEFAULT_SETTINGS = {
 };
 
 const DEFAULT_AI_SETTINGS = {
-  provider: 'groq',
-  model: 'openai/gpt-oss-120b',
+  model: '',
   accessCode: ''
 };
 
@@ -299,6 +303,8 @@ let settings = {...DEFAULT_SETTINGS, ...loadJSON(CONFIG.settingsKey, {})};
 let exam = null;
 let timerId = null;
 let lastSync = null;
+let favorites = new Set(loadJSON(CONFIG.favoritesKey, []));
+let studySession = null;
 let currentUser = null;
 let remoteHistory = [];
 let globalAnalytics = {modules:[], lectures:[], students:0, submittedExams:0, averageScore:0};
@@ -533,6 +539,7 @@ function loadJSON(key, fallback){
 function saveState(){
   localStorage.setItem(CONFIG.progressKey, JSON.stringify(progress));
   localStorage.setItem(CONFIG.settingsKey, JSON.stringify(settings));
+  localStorage.setItem(CONFIG.favoritesKey, JSON.stringify([...favorites]));
 }
 function applyTheme(){
   document.documentElement.setAttribute('data-theme', settings.darkMode ? 'dark' : 'light');
@@ -570,83 +577,26 @@ function normalizeQuestion(q, source=''){
     source: source || String(q.source || '')
   };
 }
-function validateQuestion(q, i, options={}){
-  const requireExplanation=options.requireExplanation===true;
+function validateQuestion(q, i){
   if(!q.id) return 'Missing id';
   if(!q.question) return 'Missing question';
-  if(!Array.isArray(q.options) || q.options.length !== 4) return 'Exactly 4 options required';
-  if(q.options.some(x=>!String(x||'').trim())) return 'Every option must contain text';
-  const normalizedOptions=q.options.map(x=>String(x).trim().toLowerCase());
-  if(new Set(normalizedOptions).size !== normalizedOptions.length) return 'Duplicate answer options';
+  if(!Array.isArray(q.options) || q.options.length < 2) return 'At least 2 options required';
   if(!Number.isInteger(q.correctIndex) || q.correctIndex < 0 || q.correctIndex >= q.options.length) return 'Invalid correctIndex';
   if(!q.module) return 'Missing module';
   if(!q.subject) return 'Missing subject';
   if(!q.lecture) return 'Missing lecture';
-  if(requireExplanation && !q.explanation) return 'Missing explanation';
   return '';
 }
-function validateBank(list, options={}){
+function validateBank(list){
   const errors=[], seen=new Set();
   list.forEach((raw,i)=>{
     const q=normalizeQuestion(raw, raw.source);
-    const err=validateQuestion(q,i,options);
+    const err=validateQuestion(q,i);
     if(err) errors.push(`Question ${i+1} (${q.id||'no id'}): ${err}`);
     if(q.id && seen.has(q.id)) errors.push(`Duplicate question ID: ${q.id}`);
     if(q.id) seen.add(q.id);
   });
   return errors;
-}
-function normalizeCompareText(value){
-  return String(value||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
-}
-function questionFingerprint(q){ return normalizeCompareText(q.question); }
-function questionSimilarity(a,b){
-  const A=new Set(questionFingerprint(a).split(' ').filter(w=>w.length>2));
-  const B=new Set(questionFingerprint(b).split(' ').filter(w=>w.length>2));
-  if(!A.size||!B.size)return 0;
-  let intersection=0; for(const token of A)if(B.has(token))intersection++;
-  return intersection/(A.size+B.size-intersection);
-}
-function findQuestionDuplicate(candidate, existing, threshold=0.92){
-  const fp=questionFingerprint(candidate); if(!fp)return null;
-  for(const q of existing) if(questionFingerprint(q)===fp)return {type:'exact',question:q,score:1};
-  for(const q of existing){
-    if(candidate.module!==q.module||candidate.subject!==q.subject||candidate.lecture!==q.lecture)continue;
-    const qfp=questionFingerprint(q);
-    if(Math.abs(fp.length-qfp.length)>Math.max(fp.length,qfp.length)*0.35)continue;
-    const score=questionSimilarity(candidate,q);
-    if(score>=threshold)return {type:'near',question:q,score};
-  }
-  return null;
-}
-function analyzeQuestionBank(list){
-  const normalized=list.map((raw,i)=>normalizeQuestion(raw,raw.source));
-  const invalid=[],idMap=new Map(),textMap=new Map(),duplicateIds=[],duplicateTexts=[],duplicateOptions=[],missingExplanations=[];
-  normalized.forEach((q,i)=>{
-    const err=validateQuestion(q,i); if(err)invalid.push(`Question ${i+1} (${q.id||'no id'}): ${err}`);
-    if(q.id){if(idMap.has(q.id))duplicateIds.push(q.id);else idMap.set(q.id,q);}
-    const fp=questionFingerprint(q); if(fp){if(textMap.has(fp))duplicateTexts.push({id:q.id,other:textMap.get(fp).id});else textMap.set(fp,q);}
-    const opts=q.options.map(x=>normalizeCompareText(x)); if(opts.length===4&&new Set(opts).size!==4)duplicateOptions.push(q.id||`Question ${i+1}`);
-    if(!q.explanation)missingExplanations.push(q.id||`Question ${i+1}`);
-  });
-  return {total:normalized.length,invalid,duplicateIds:[...new Set(duplicateIds)],duplicateTexts,duplicateOptions,missingExplanations};
-}
-function renderBankHealth(){
-  const el=document.getElementById('bankHealth');if(!el)return;
-  const stats=analyzeQuestionBank(allQuestionBank.length?allQuestionBank:bank);
-  const issues=[
-    stats.invalid.length?`${stats.invalid.length} validation error${stats.invalid.length===1?'':'s'}`:'',
-    stats.duplicateIds.length?`${stats.duplicateIds.length} duplicate ID${stats.duplicateIds.length===1?'':'s'}`:'',
-    stats.duplicateTexts.length?`${stats.duplicateTexts.length} duplicate question${stats.duplicateTexts.length===1?'':'s'}`:'',
-    stats.duplicateOptions.length?`${stats.duplicateOptions.length} question${stats.duplicateOptions.length===1?'':'s'} with duplicate options`:''
-  ].filter(Boolean);
-  const good=!issues.length, tone=good?'ok':'error';
-  const examples=[...stats.invalid.slice(0,3),...stats.duplicateIds.slice(0,3).map(x=>`Duplicate ID: ${x}`),...stats.duplicateTexts.slice(0,3).map(x=>`Duplicate text: ${x.id} ↔ ${x.other}`),...stats.duplicateOptions.slice(0,3).map(x=>`Duplicate options: ${x}`)];
-  el.innerHTML=`<div class="category-head"><div><b>Question Bank Health</b><div class="mini">Scanned ${stats.total.toLocaleString()} loaded questions.</div></div><button class="btn" onclick="renderBankHealth()">Scan again</button></div>
-  <div class="notice ${tone}" style="margin-top:12px"><b>${good?'Health check passed':'Attention needed'}</b> · ${esc(issues.join(' · ')||'No structural or duplicate-content problems detected.')}</div>
-  <div class="grid three" style="margin-top:12px"><div class="card stat"><div class="label">Valid structure</div><div class="value">${stats.total-stats.invalid.length}</div></div><div class="card stat"><div class="label">Missing explanations</div><div class="value">${stats.missingExplanations.length}</div></div><div class="card stat"><div class="label">Duplicate content</div><div class="value">${stats.duplicateTexts.length}</div></div></div>
-  ${examples.length?`<div class="mini" style="margin-top:12px;white-space:pre-wrap">${esc(examples.join('\n'))}</div>`:''}
-  ${stats.missingExplanations.length?`<div class="mini" style="margin-top:8px">Questions without explanations: ${esc(stats.missingExplanations.slice(0,12).join(', '))}${stats.missingExplanations.length>12?' …':''}</div>`:''}`;
 }
 
 async function fetchJSON(url){
@@ -657,21 +607,11 @@ async function fetchJSON(url){
 async function loadQuestionsFromSupabase(){
   if(!SUPABASE_ENABLED)return false;
   try{
-    const PAGE_SIZE=1000;
-    const allRows=[];
-    for(let from=0;;from+=PAGE_SIZE){
-      const to=from+PAGE_SIZE-1;
-      const {data,error}=await supabaseClient
-        .from('questions')
-        .select('id,module,subject,lecture,question,options,correct_index,explanation,difficulty,reference')
-        .order('id',{ascending:true})
-        .range(from,to);
-      if(error)throw error;
-      if(!Array.isArray(data))throw new Error('Invalid questions response.');
-      allRows.push(...data);
-      if(data.length<PAGE_SIZE)break;
-    }
-    const data=allRows;
+    const {data,error}=await supabaseClient
+      .from('questions')
+      .select('id,module,subject,lecture,question,options,correct_index,explanation,difficulty,reference');
+    if(error)throw error;
+    if(!Array.isArray(data))throw new Error('Invalid questions response.');
     const all=data.map(q=>normalizeQuestion({
       id:q.id,module:q.module,subject:q.subject,lecture:q.lecture,question:q.question,
       options:q.options,correctIndex:q.correct_index,explanation:q.explanation,
@@ -804,6 +744,9 @@ function render(){
   else if(v==='progress') renderProgress();
   else if(v==='history') renderHistory();
   else if(v==='mistakes') renderMistakes();
+  else if(v==='study') renderStudyMode();
+  else if(v==='weak') renderWeakTopics();
+  else if(v==='favorites') renderFavorites();
   else if(v==='bank') renderBank();
   else if(v==='import') renderImport();
   else if(v==='ai') renderAIAssistant();
@@ -853,6 +796,7 @@ function renderDashboard(){
     <div class="bar"><i style="width:${progressFor(list)}%"></i></div>
     <div class="mini" style="margin-top:8px">${practicedCount(list)} of ${list.length} practiced</div></div>`;
   }).join('') || '<div class="card empty">No questions loaded yet.</div>'}</div>
+  <div class="actions" style="margin:16px 0"><button class="btn primary" onclick="go('study')">Study Mode</button><button class="btn" onclick="go('weak')">Weak Topics</button><button class="btn" onclick="go('favorites')">Favorites</button></div>
   <h2 class="section-title">Recent exams</h2>
   <div class="card">${renderRecentExamsList(3)}
     <div class="actions" style="margin-top:12px"><button class="btn" onclick="go('history')">View full history</button></div>
@@ -1045,7 +989,7 @@ function renderQuiz(){
   const remaining=exam.minutes?Math.max(0,exam.minutes*60-Math.floor((Date.now()-exam.started)/1000)):0;
   const answeredCount=exam.list.filter(item=>exam.answers[item.id]!==undefined).length;
   const body=`<div class="quiz"><div class="card">
-    <div class="qhead"><span class="pill">${exam.index+1} / ${exam.list.length}</span><span class="mini">${esc(q.module)} · ${esc(q.subject)} · ${esc(q.lecture)}</span>${exam.minutes?`<span class="timer" id="timer">${formatTime(remaining)}</span>`:''}</div>
+    <div class="qhead"><span class="pill">${exam.index+1} / ${exam.list.length}</span><span class="mini">${esc(q.module)} · ${esc(q.subject)} · ${esc(q.lecture)}</span><button class="btn" style="margin-left:auto" onclick="toggleFavorite('${attrJs(q.id)}')">${isFavorite(q)?'★':'☆'}</button>${exam.minutes?`<span class="timer" id="timer">${formatTime(remaining)}</span>`:''}</div>
     <div class="bar"><i style="width:${pct(exam.index,exam.list.length-1)}%"></i></div>
     <div class="question-nav" aria-label="Question navigation">
       <div style="width:100%;display:flex;justify-content:space-between;align-items:center">
@@ -1106,8 +1050,8 @@ async function submitExam(auto){
     const k=key(q);
     if(!progress[k])progress[k]={attempts:0,correct:0,wrong:0,last:null};
     progress[k].attempts++;
-    if(a===q.correctIndex){progress[k].correct++;correct++;progress[k].last='correct';}
-    else {progress[k].wrong++;progress[k].last='wrong';}
+    if(a===q.correctIndex){progress[k].correct++;correct++;progress[k].last='correct'; scheduleReview(q,true);}
+    else {progress[k].wrong++;progress[k].last='wrong'; scheduleReview(q,false);}
   });
   saveState();
   const unanswered=exam.list.filter(q=>exam.answers[q.id]===undefined).length;
@@ -1285,6 +1229,127 @@ function renderMistakes(){
   document.getElementById('app').innerHTML=layout('Mistakes','Questions you answered incorrectly at least once.',body);
 }
 
+
+function isFavorite(q){ return favorites.has(key(q)); }
+function toggleFavorite(id){
+  if(favorites.has(id)) favorites.delete(id); else favorites.add(id);
+  saveState();
+  render();
+}
+function progressRecord(q){
+  const k=key(q); if(!progress[k]) progress[k]={attempts:0,correct:0,wrong:0,last:null,interval:0,nextReview:null,streak:0};
+  return progress[k];
+}
+function isDue(q){
+  const p=progress[key(q)];
+  if(!p || !p.nextReview) return true;
+  return new Date(p.nextReview).getTime() <= Date.now();
+}
+function reviewLabel(q){
+  const p=progress[key(q)];
+  if(!p || !p.nextReview) return 'New';
+  const t=new Date(p.nextReview).getTime();
+  if(t<=Date.now()) return 'Due now';
+  return 'Review '+new Date(p.nextReview).toLocaleDateString();
+}
+function scheduleReview(q, ok){
+  const p=progressRecord(q);
+  if(ok){
+    p.streak=(p.streak||0)+1;
+    const steps=[1,3,7,14,30];
+    p.interval=steps[Math.min(p.streak-1,steps.length-1)];
+  }else{
+    p.streak=0;
+    p.interval=1;
+  }
+  const d=new Date(); d.setDate(d.getDate()+(p.interval||1));
+  p.nextReview=d.toISOString();
+}
+function weakTopicData(){
+  const map=new Map();
+  bank.forEach(q=>{
+    const p=progress[key(q)];
+    if(!p || !p.attempts) return;
+    const id=[q.module,q.subject,q.lecture].join('|||');
+    if(!map.has(id)) map.set(id,{module:q.module,subject:q.subject,lecture:q.lecture,total:0,correct:0,wrong:0});
+    const x=map.get(id); x.total+=p.attempts; x.correct+=p.correct||0; x.wrong+=p.wrong||0;
+  });
+  return [...map.values()].map(x=>({...x,accuracy:x.total?Math.round(x.correct/x.total*100):0})).sort((a,b)=>a.accuracy-b.accuracy||b.total-a.total);
+}
+function startStudyFromFilters(){
+  const m=document.getElementById('studyModule').value, s=document.getElementById('studySubject').value, l=document.getElementById('studyLecture').value;
+  const n=Math.max(1,Math.min(50,Number(document.getElementById('studyCount').value)||10));
+  let list=bank.filter(q=>(!m||q.module===m)&&(!s||q.subject===s)&&(!l||q.lecture===l));
+  if(!list.length){toast('No questions match these filters.','error');return;}
+  const due=list.filter(isDue);
+  const pool=due.length?due:list;
+  studySession={list:shuffle([...pool]).slice(0,n),index:0,answers:{},started:Date.now(),revealed:false};
+  renderStudyQuestion();
+}
+function startStudy(list,label='Study Mode'){
+  if(!list.length){toast('No questions available for this study session.','error');return;}
+  studySession={list:shuffle([...list]).slice(0,50),index:0,answers:{},started:Date.now(),revealed:false,label};
+  renderStudyQuestion();
+}
+function renderStudyMode(){
+  const modules=getModules();
+  const body=`<div class="card">
+    <div class="filters">
+      <div class="field"><label>Module</label><select id="studyModule" onchange="updateStudySubjects()"><option value="">All modules</option>${modules.map(m=>`<option>${esc(m)}</option>`).join('')}</select></div>
+      <div class="field"><label>Subject</label><select id="studySubject" onchange="updateStudyLectures()"><option value="">All subjects</option>${getSubjects().map(x=>`<option>${esc(x)}</option>`).join('')}</select></div>
+      <div class="field"><label>Lecture</label><select id="studyLecture"><option value="">All lectures</option>${getLectures().map(x=>`<option>${esc(x)}</option>`).join('')}</select></div>
+      <div class="field"><label>Questions</label><input id="studyCount" type="number" min="1" max="50" value="10"></div>
+    </div>
+    <div class="actions" style="margin-top:14px"><button class="btn primary" onclick="startStudyFromFilters()">Start Study Session</button><button class="btn" onclick="startStudy(bank.filter(isDue),'Due Reviews')">Review Due Questions</button><button class="btn" onclick="startStudy(bank.filter(q=>isFavorite(q)),'Favorites')">Study Favorites</button></div>
+  </div>
+  <div class="grid three" style="margin-top:16px">
+    <div class="card stat"><div class="label">Due for review</div><div class="value">${bank.filter(isDue).length}</div></div>
+    <div class="card stat"><div class="label">Favorites</div><div class="value">${favorites.size}</div></div>
+    <div class="card stat"><div class="label">Questions practiced</div><div class="value">${practicedCount(bank)}</div></div>
+  </div>
+  <div class="card" style="margin-top:16px"><strong>How Study Mode works</strong><p class="mini" style="margin-top:8px">Study Mode is untimed. Answer a question, see the explanation immediately, then continue. Correct answers are scheduled farther into the future; incorrect answers return sooner.</p></div>`;
+  document.getElementById('app').innerHTML=layout('Study Mode','Focused learning with explanations and spaced review.',body);
+}
+function updateStudySubjects(){
+  const m=document.getElementById('studyModule').value;
+  document.getElementById('studySubject').innerHTML='<option value="">All subjects</option>'+getSubjects(m).map(s=>`<option>${esc(s)}</option>`).join('');
+  updateStudyLectures();
+}
+function updateStudyLectures(){
+  const m=document.getElementById('studyModule').value,s=document.getElementById('studySubject').value;
+  document.getElementById('studyLecture').innerHTML='<option value="">All lectures</option>'+getLectures(m,s).map(l=>`<option>${esc(l)}</option>`).join('');
+}
+function renderStudyQuestion(){
+  if(!studySession || studySession.index>=studySession.list.length){
+    const total=studySession?.list.length||0, correct=studySession?studySession.list.filter(q=>studySession.answers[key(q)]===q.correctIndex).length:0;
+    studySession=null; saveState();
+    const body=`<div class="card"><div class="grid stats"><div class="card stat"><div class="label">Questions</div><div class="value">${total}</div></div><div class="card stat"><div class="label">Correct</div><div class="value">${correct}</div></div><div class="card stat"><div class="label">Accuracy</div><div class="value">${total?Math.round(correct/total*100):0}%</div></div></div><div class="actions"><button class="btn primary" onclick="go('study')">Study Again</button><button class="btn" onclick="go('dashboard')">Dashboard</button></div></div>`;
+    document.getElementById('app').innerHTML=layout('Study Complete','Your review session is finished.',body); return;
+  }
+  const q=studySession.list[studySession.index], chosen=studySession.answers[key(q)];
+  const answered=chosen!==undefined;
+  const opts=q.options.map((o,i)=>{let cls='option'; if(answered){if(i===q.correctIndex)cls+=' correct'; if(i===chosen&&i!==q.correctIndex)cls+=' wrong';} return `<button class="${cls}" ${answered?'disabled':''} onclick="answerStudy(${i})">${String.fromCharCode(65+i)}. ${esc(o)}</button>`}).join('');
+  const p=progress[key(q)];
+  const body=`<div class="card"><div class="qhead"><span class="pill">${studySession.index+1} / ${studySession.list.length}</span><span class="mini">${esc(q.module)} · ${esc(q.subject)} · ${esc(q.lecture)}</span><button class="btn" style="margin-left:auto" onclick="toggleFavorite('${attrJs(q.id)}')">${isFavorite(q)?'★ Favorited':'☆ Favorite'}</button></div><div class="bar"><i style="width:${pct(studySession.index,studySession.list.length-1)}%"></i></div><div class="mini" style="margin-top:8px">${reviewLabel(q)}${p?.streak?` · ${p.streak} correct streak`:''}</div><div class="question" style="margin-top:16px">${esc(q.question)}</div><div class="options">${opts}</div>${answered?`<div class="review ${chosen===q.correctIndex?'good':'bad'}"><b>${chosen===q.correctIndex?'Correct':'Incorrect'}</b><br>Correct answer: <b>${esc(q.options[q.correctIndex])}</b>${q.explanation?`<br>${esc(q.explanation)}`:'<br>No explanation provided.'}</div>`:''}<div class="quiz-footer"><button class="btn" onclick="go('study')">Exit</button>${answered?`<button class="btn primary" onclick="nextStudy()">${studySession.index===studySession.list.length-1?'Finish':'Next'}</button>`:''}</div></div>`;
+  document.getElementById('app').innerHTML=layout('Study Session','Answer first, then review the explanation.',body);
+}
+function answerStudy(i){
+  if(!studySession)return; const q=studySession.list[studySession.index], k=key(q); if(studySession.answers[k]!==undefined)return;
+  studySession.answers[k]=i; const ok=i===q.correctIndex; const p=progressRecord(q); p.attempts++; if(ok){p.correct++;p.last='correct';}else{p.wrong++;p.last='wrong';} scheduleReview(q,ok); saveState(); renderStudyQuestion();
+}
+function nextStudy(){if(!studySession)return; studySession.index++; renderStudyQuestion();}
+function renderWeakTopics(){
+  const rows=weakTopicData();
+  const weak=rows.filter(x=>x.total>=2);
+  const body=`<div class="card"><div class="category-head"><strong>Topics that need more practice</strong><span class="mini">Based on answered questions in this browser.</span></div>${weak.length?`<div style="margin-top:14px">${weak.slice(0,30).map((x,i)=>`<div class="category-card"><div class="category-head"><div><b>${esc(x.subject)}</b><div class="mini">${esc(x.module)} · ${esc(x.lecture)}</div></div><span class="pill">${x.accuracy}% accuracy</span></div><div class="bar" style="margin-top:10px"><i style="width:${x.accuracy}%"></i></div><div class="mini" style="margin-top:8px">${x.total} attempts · ${x.wrong} wrong</div><div class="actions" style="margin-top:10px"><button class="btn primary" onclick="startExam(bank.filter(q=>q.module==='${attrJs(x.module)}'&&q.subject==='${attrJs(x.subject)}'&&q.lecture==='${attrJs(x.lecture)}'),null,'Weak topic practice')">Practice this topic</button></div></div>`).join('')}</div>`:'<div class="empty" style="margin-top:14px">Answer at least two questions in a topic to see its performance here.</div>'}</div>`;
+  document.getElementById('app').innerHTML=layout('Weak Topics','Find the subjects and lectures where your accuracy is lowest.',body);
+}
+function renderFavorites(){
+  const list=bank.filter(q=>favorites.has(key(q)));
+  const body=`<div class="card"><div class="category-head"><strong>${list.length} favorite question${list.length===1?'':'s'}</strong><span class="mini">Favorites are stored in this browser.</span></div>${list.length?`<div style="margin-top:14px">${list.map(q=>`<div class="category-card"><div class="category-head"><b>${esc(q.question)}</b><button class="btn" onclick="toggleFavorite('${attrJs(q.id)}')">★ Remove</button></div><div class="mini">${esc(q.module)} · ${esc(q.subject)} · ${esc(q.lecture)}</div></div>`).join('')}</div><div class="actions" style="margin-top:12px"><button class="btn primary" onclick="startStudy(bank.filter(q=>favorites.has(key(q))),'Favorites')">Study Favorites</button></div>`:'<div class="empty" style="margin-top:14px">No favorites yet. Use the ☆ Favorite button during Study Mode.</div>'}</div>`;
+  document.getElementById('app').innerHTML=layout('Favorites','Save high-yield questions for quick review.',body);
+}
+
 function renderBank(){
   const modules=getModules();
   const body=`<div class="card"><div class="actions" style="margin-bottom:12px"><button class="btn primary" onclick="go('import')">+ Add questions</button><span class="mini">Built-in questions are saved locally in this browser.</span></div><div class="filters"><div class="field"><label>Search</label><input id="bankSearch" oninput="filterBank()" placeholder="Search question, ID, subject or lecture"></div><div class="field"><label>Module</label><select id="bankModule" onchange="filterBank()"><option value="">All</option>${modules.map(m=>`<option>${esc(m)}</option>`).join('')}</select></div><div class="field"><label>Subject</label><select id="bankSubject" onchange="filterBank()"><option value="">All</option>${getSubjects().map(s=>`<option>${esc(s)}</option>`).join('')}</select></div><div class="field"><label>Lecture</label><select id="bankLecture" onchange="filterBank()"><option value="">All</option>${getLectures().map(l=>`<option>${esc(l)}</option>`).join('')}</select></div></div><div class="filters" style="margin-top:10px"><div class="field"><label>Source</label><select id="bankSource" onchange="filterBank()"><option value="">All files</option>${sourceFiles.map(f=>`<option>${esc(f)}</option>`).join('')}</select></div></div></div>
@@ -1292,24 +1357,11 @@ function renderBank(){
   document.getElementById('app').innerHTML=layout('Question Bank','Questions are loaded from Supabase when connected, with GitHub as a fallback.',body);
   filterBank();
 }
-let bankPage=0;
-const BANK_PAGE_SIZE=500;
-function filterBank(resetPage=true){
+function filterBank(){
   const s=(document.getElementById('bankSearch')?.value||'').toLowerCase(),mod=document.getElementById('bankModule')?.value||'',subj=document.getElementById('bankSubject')?.value||'',lect=document.getElementById('bankLecture')?.value||'',src=document.getElementById('bankSource')?.value||'';
-  if(resetPage) bankPage=0;
   const list=bank.filter(q=>(!s||[q.id,q.question,q.subject,q.module,q.lecture].join(' ').toLowerCase().includes(s))&&(!mod||q.module===mod)&&(!subj||q.subject===subj)&&(!lect||q.lecture===lect)&&(!src||q.source===src));
   const rows=document.getElementById('bankRows');if(!rows)return;
-  const totalPages=Math.max(1,Math.ceil(list.length/BANK_PAGE_SIZE));
-  if(bankPage>=totalPages) bankPage=totalPages-1;
-  const start=bankPage*BANK_PAGE_SIZE;
-  const pageRows=list.slice(start,start+BANK_PAGE_SIZE);
-  rows.innerHTML=pageRows.map(q=>`<tr><td><b>${esc(q.id)}</b></td><td>${esc(q.module)}</td><td>${esc(q.subject)}</td><td>${esc(q.lecture)}</td><td>${esc(q.question)}</td><td>${progressFor([q])}% · ${accuracyFor([q])}% acc.</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No matching questions.</td></tr>';
-  const table=rows.closest('.table-wrap');
-  if(table){
-    let pager=document.getElementById('bankPager');
-    if(!pager){ pager=document.createElement('div'); pager.id='bankPager'; pager.className='actions'; table.parentElement.appendChild(pager); }
-    pager.innerHTML=`<span class="mini">Showing ${list.length?start+1:0}–${Math.min(start+BANK_PAGE_SIZE,list.length)} of ${list.length} matching questions</span><button class="btn" ${bankPage<=0?'disabled':''} onclick="bankPage--;filterBank(false)">Previous</button><span class="mini">Page ${bankPage+1} / ${totalPages}</span><button class="btn" ${bankPage>=totalPages-1?'disabled':''} onclick="bankPage++;filterBank(false)">Next</button>`;
-  }
+  rows.innerHTML=list.slice(0,500).map(q=>`<tr><td><b>${esc(q.id)}</b></td><td>${esc(q.module)}</td><td>${esc(q.subject)}</td><td>${esc(q.lecture)}</td><td>${esc(q.question)}</td><td>${progressFor([q])}% · ${accuracyFor([q])}% acc.</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No matching questions.</td></tr>';
 }
 
 function renderImport(){
@@ -1354,10 +1406,6 @@ function renderImport(){
   <div id="importPreview" class="card" style="margin-top:16px"><div class="empty">Add a question above, or preview a JSON set here.</div></div>
 
   <div class="card" style="margin-top:16px">
-    <div id="bankHealth"></div>
-  </div>
-
-  <div class="card" style="margin-top:16px">
     <h3 style="margin-top:0">Module visibility</h3>
     <div class="mini" style="margin-bottom:12px">Hide a module from students without deleting its questions. Hidden modules remain visible to administrators.</div>
     <div id="adminModuleVisibility"></div>
@@ -1398,7 +1446,6 @@ function renderImport(){
   document.getElementById('app').innerHTML=layout('Admin · Question Bank','Upload, update, add, and remove questions for all students.',body);
   renderAdminQuestionList();
   renderModuleVisibility();
-  renderBankHealth();
   loadAdminNotifications();
 }
 
@@ -1607,15 +1654,11 @@ function showImportPreview(data){
   const existingIds=new Set(bank.map(q=>q.id));
   const updates=normalized.filter(q=>existingIds.has(q.id)).length;
   const additions=normalized.length-updates;
-  const duplicateContent=normalized.map(q=>({q,dup:findQuestionDuplicate(q,bank)})).filter(x=>x.dup);
-  const warningHtml=duplicateContent.length
-    ? `<div class="notice" style="margin-top:10px"><b>Duplicate-content warning:</b> ${duplicateContent.length} question${duplicateContent.length===1?'':'s'} closely match existing bank questions.<div class="mini" style="margin-top:6px">${esc(duplicateContent.slice(0,8).map(x=>`${x.q.id||'no id'} ↔ ${x.dup.question.id||'no id'} (${x.dup.type==='exact'?'exact':'very similar'})`).join('\n'))}${duplicateContent.length>8?'\n…':''}</div></div>`
-    : '';
   const errorHtml=allErrors.length
     ? `<div class="notice error"><b>Fix these problems before uploading:</b><div style="white-space:pre-wrap;margin-top:6px">${esc(allErrors.slice(0,30).join('\n'))}</div>${allErrors.length>30?`<div class="mini" style="margin-top:6px">Showing the first 30 errors.</div>`:''}</div>`
     : '<div class="notice ok"><b>Validation passed.</b> The questions are ready to upload.</div>';
   const cards=normalized.slice(0,20).map((q,i)=>`<div class="category-card"><div class="category-head"><div><b>${esc(q.id||`Question ${i+1}`)}</b><div class="mini">${esc(q.module)} · ${esc(q.subject)} · ${esc(q.lecture)}</div></div><span class="pill">Correct: ${String.fromCharCode(65+(Number(q.correctIndex)||0))}</span></div><div style="margin-top:7px">${esc(q.question)}</div><div class="mini" style="margin-top:6px">A. ${esc(q.options?.[0]||'')} · B. ${esc(q.options?.[1]||'')} · C. ${esc(q.options?.[2]||'')} · D. ${esc(q.options?.[3]||'')}</div></div>`).join('');
-  preview.innerHTML=`<div class="category-head"><h3 style="margin:0">JSON Preview</h3><span class="pill">${normalized.length} question${normalized.length===1?'':'s'}</span></div><div class="mini" style="margin:8px 0 12px">${additions} new · ${updates} existing ID${updates===1?'':'s'} will be updated · ${allErrors.length} validation error${allErrors.length===1?'':'s'}</div>${errorHtml}${warningHtml}<div class="mini" style="margin:14px 0 8px">Showing ${Math.min(20,normalized.length)} of ${normalized.length} questions.</div>${cards||'<div class="empty">The JSON array is empty.</div>'}${!allErrors.length&&normalized.length?`<div class="actions" style="margin-top:14px"><button class="btn primary" onclick="uploadPreviewToSupabase()">Upload ${normalized.length} to Supabase</button><button class="btn" onclick="addPreviewQuestions(pendingImportQuestions)">Add to this browser</button><button class="btn" onclick="replaceWithPreviewBank(pendingImportQuestions)">Use as browser preview</button></div>`:''}`;
+  preview.innerHTML=`<div class="category-head"><h3 style="margin:0">JSON Preview</h3><span class="pill">${normalized.length} question${normalized.length===1?'':'s'}</span></div><div class="mini" style="margin:8px 0 12px">${additions} new · ${updates} existing ID${updates===1?'':'s'} will be updated · ${allErrors.length} validation error${allErrors.length===1?'':'s'}</div>${errorHtml}<div class="mini" style="margin:14px 0 8px">Showing ${Math.min(20,normalized.length)} of ${normalized.length} questions.</div>${cards||'<div class="empty">The JSON array is empty.</div>'}${!allErrors.length&&normalized.length?`<div class="actions" style="margin-top:14px"><button class="btn primary" onclick="uploadPreviewToSupabase()">Upload ${normalized.length} to Supabase</button><button class="btn" onclick="addPreviewQuestions(pendingImportQuestions)">Add to this browser</button><button class="btn" onclick="replaceWithPreviewBank(pendingImportQuestions)">Use as browser preview</button></div>`:''}`;
 }
 async function uploadPreviewToSupabase(){
   if(!(await requireAdmin())) return;
@@ -1693,6 +1736,7 @@ function renderSettings(){
     </p>
   </div>
   <div class="actions" style="margin-top:16px"><button class="btn primary" onclick="saveSettings()">Save settings</button><button class="btn" onclick="exportProgress()">Export my progress</button>${isAdmin ? '<button class="btn" onclick="exportBank()">Export current bank</button>' : ''}<button class="btn" onclick="exportHistory()">Export exam history</button><button class="btn danger" onclick="clearHistory()">Clear exam history</button></div></div>
+  <div class="card" style="margin-top:16px"><h3 style="margin-top:0">Phase 2 study features</h3><p class="mini">Study Mode, favorites, weak-topic analysis and spaced review are stored locally in this browser. Correct answers are scheduled at 1, 3, 7, 14 and 30 day intervals; incorrect answers return the next day.</p></div>
   <div class="card" style="margin-top:16px"><h3 style="margin-top:0">About storage</h3><p class="mini">The question bank is loaded from Supabase when connected, with GitHub as fallback. Signed-in student progress and exam history are stored in Supabase and follow the account across devices. AI questions and chat history are also stored only in this browser. AI requests are relayed through this site's own server-side function — no personal API key is ever stored in or sent from your browser.</p></div>`;
   document.getElementById('app').innerHTML=layout('Settings','Personal browser settings and backups.',body);
 }
@@ -1706,79 +1750,51 @@ function exportBank(){ if(!isAdmin){toast('Admin access required.','error');retu
 function exportHistory(){downloadBlob(JSON.stringify({exportedAt:new Date().toISOString(),history:loadJSON(CONFIG.historyKey,[])},null,2),'med64-exam-history.json','application/json');}
 
 /* ============================================================
-   AI Assistant (multi-provider)
-   - Groq direct
-   - Gemini direct
-   - OpenRouter (third provider / multi-model gateway)
-   - API credentials stay server-side in Vercel environment variables
+   AI Assistant (Gemini)
+   - Generates new questions in the site's question format
+   - Lets the user chat with the model about anything
+   - Generated questions are kept separate until added to the bank
+   - The API key lives only in this browser and calls Google's
+     Generative Language API through a server-side proxy (/api/gemini),
+     so visitors never need to bring their own API key.
    ============================================================ */
 
 let aiTab='generate';
 
-const AI_PROVIDER_MODELS={
-  groq:[
-    {id:'openai/gpt-oss-120b',label:'GPT-OSS 120B — high reasoning'},
-    {id:'qwen/qwen3-32b',label:'Qwen 3 32B — structured / high volume'}
-  ],
-  gemini:[
-    {id:'gemini-3.6-flash',label:'Gemini 3.6 Flash — recommended for MCQ generation'}
-  ],
-  openrouter:[
-    {id:'google/gemma-4-31b-it:free',label:'Gemma 4 31B — free JSON (recommended)'},
-    {id:'google/gemma-4-26b-a4b-it:free',label:'Gemma 4 26B A4B — free JSON'},
-    {id:'openrouter/free',label:'OpenRouter Free Router — structured JSON'}
-  ]
-};
-
-function aiProviderLabel(provider){
-  return provider==='gemini'?'Google Gemini':provider==='openrouter'?'OpenRouter':'Groq';
-}
-function ensureAIModelForProvider(){
-  if(aiSettings.provider==='vercel') aiSettings.provider='openrouter';
-  const provider=aiSettings.provider||'groq';
-  const models=AI_PROVIDER_MODELS[provider]||AI_PROVIDER_MODELS.groq;
-  if(!models.some(m=>m.id===aiSettings.model)) aiSettings.model=models[0].id;
-}
-ensureAIModelForProvider();
-
-let lastAIResponseMeta=null;
-async function callAI(contents, generationConfig){
-  let res,data;
+async function callGemini(contents, generationConfig){
+  let res, data;
   const headers={'Content-Type':'application/json'};
-  if(aiSettings.accessCode)headers['x-access-code']=aiSettings.accessCode;
+  if(aiSettings.accessCode) headers['x-access-code']=aiSettings.accessCode;
   try{
-    res=await fetch('/api/ai',{method:'POST',headers,body:JSON.stringify({provider:aiSettings.provider||'groq',model:aiSettings.model,contents,generationConfig})});
-  }catch(e){const err=new Error('Could not reach the AI service. Check your connection.');err.code='NETWORK_ERROR';throw err;}
-  try{data=await res.json();}catch(e){data=null;}
-  lastAIResponseMeta={status:res.status,model:data?.model||aiSettings.model,provider:data?.provider||aiProviderLabel(aiSettings.provider),finishReason:data?.finishReason||null,requestId:data?.requestId||null};
-  if(!res.ok){const err=new Error((data&&data.error)||`HTTP ${res.status} from the AI service.`);err.status=res.status;err.meta=lastAIResponseMeta;throw err;}
-  const text=data&&data.text;
-  if(!text){const finish=data?.finishReason?` Finish reason: ${data.finishReason}.`:'';const err=new Error(`${aiProviderLabel(aiSettings.provider)} returned an empty response.${finish}`);err.meta=lastAIResponseMeta;throw err;}
+    res=await fetch('/api/gemini',{
+      method:'POST',
+      headers,
+      body:JSON.stringify({contents, generationConfig, model: aiSettings.model || undefined})
+    });
+  }catch(e){
+    throw new Error('Could not reach the AI service. Check your connection.');
+  }
+  try{ data=await res.json(); }catch(e){ data=null; }
+  if(!res.ok){
+    throw new Error((data && data.error) || `HTTP ${res.status} from the AI service.`);
+  }
+  const text=data && data.text;
+  if(!text) throw new Error('The model returned an empty response.');
   return text;
 }
 
 function renderAIAssistant(){
-  ensureAIModelForProvider();
-  const provider=aiSettings.provider||'groq';
-  const models=AI_PROVIDER_MODELS[provider]||AI_PROVIDER_MODELS.groq;
   const body=`
   <div class="card">
-    <div class="category-head"><strong>AI Assistant</strong><span class="ai-badge">✦ ${esc(aiProviderLabel(provider))}</span></div>
-    <p class="mini" style="margin:8px 0 0">Choose the AI provider and model used for question generation and AI chat. API keys stay on the Vercel server and are never exposed to website visitors.</p>
-    <div class="grid two" style="margin-top:12px">
-      <div class="field"><label>AI provider</label><select id="aiProvider" onchange="changeAIProvider()">
-        <option value="groq" ${provider==='groq'?'selected':''}>Groq</option>
-        <option value="gemini" ${provider==='gemini'?'selected':''}>Google Gemini</option>
-        <option value="openrouter" ${provider==='openrouter'?'selected':''}>OpenRouter</option>
-      </select></div>
-      <div class="field"><label>AI model</label><select id="aiModel">${models.map(m=>`<option value="${attrJs(m.id)}" ${m.id===aiSettings.model?'selected':''}>${esc(m.label)}</option>`).join('')}</select></div>
-    </div>
+    <div class="category-head"><strong>Gemini AI</strong><span class="ai-badge">✦ Gemini 3.6</span></div>
+    <p class="mini" style="margin:8px 0 0">Questions and chat are powered by this site's own server (a Vercel serverless function). Nobody needs to bring a personal API key — the key lives only on the server and is never sent to or stored in your browser.</p>
     <details style="margin-top:10px">
       <summary class="mini" style="cursor:pointer;color:var(--primary2);font-weight:700">Advanced settings</summary>
       <div class="grid two" style="margin-top:10px">
+        <div class="field"><label>Model override (optional)</label><input id="aiModel" placeholder="Uses the server default" value="${esc(aiSettings.model)}"></div>
         <div class="field"><label>Access code (only if this site requires one)</label><input id="aiAccessCode" type="password" placeholder="Leave blank if none" value="${esc(aiSettings.accessCode)}"></div>
       </div>
-      <div class="actions" style="margin-top:10px"><button class="btn" onclick="saveAISettings()">Save AI settings</button></div>
+      <div class="actions" style="margin-top:10px"><button class="btn" onclick="saveAISettings()">Save</button></div>
     </details>
   </div>
 
@@ -1788,23 +1804,16 @@ function renderAIAssistant(){
   </div>
 
   ${aiTab==='generate'?aiGenerateTabHTML():aiChatTabHTML()}`;
-  document.getElementById('app').innerHTML=layout('AI Assistant',`Generate practice questions or ask ${aiProviderLabel(provider)}.`,body);
+  document.getElementById('app').innerHTML=layout('AI Assistant','Generate practice questions or ask Gemini anything.',body);
   if(aiTab==='chat') scrollChatToBottom();
 }
 function setAITab(tab){ aiTab=tab; renderAIAssistant(); }
-function changeAIProvider(){
-  const provider=document.getElementById('aiProvider')?.value||'groq';
-  aiSettings.provider=provider;
-  ensureAIModelForProvider();
-  localStorage.setItem(CONFIG.aiSettingsKey,JSON.stringify(aiSettings));
-  renderAIAssistant();
-}
 
 function aiGenerateTabHTML(){
   const modules=getModules();
   return `<div class="card">
-    <h3 style="margin-top:0">Generate questions with ${esc(aiProviderLabel(aiSettings.provider))} · ${esc((AI_PROVIDER_MODELS[aiSettings.provider]||[]).find(m=>m.id===aiSettings.model)?.label||aiSettings.model)}</h3>
-    <p class="mini" style="margin:6px 0 14px">Choose from the modules, subjects and lectures that already exist in your website question bank. Then choose whether the selected AI should use its medical knowledge or your website questions as the source.</p>
+    <h3 style="margin-top:0">Generate questions with Gemini 3.6 Flash</h3>
+    <p class="mini" style="margin:6px 0 14px">Choose from the modules, subjects and lectures that already exist in your website question bank. Then choose whether Gemini should use its medical knowledge or your website questions as the source.</p>
     <div class="grid three">
       <div class="field"><label>Module</label><select id="genModule" onchange="updateAIGeneratorSubjects()"><option value="">Select module</option>${modules.map(m=>`<option value="${attrJs(m)}">${esc(m)}</option>`).join('')}</select></div>
       <div class="field"><label>Subject</label><select id="genSubject" onchange="updateAIGeneratorLectures()" disabled><option value="">Select subject</option></select></div>
@@ -1821,9 +1830,9 @@ function aiGenerateTabHTML(){
         <option value="Higher-order thinking" selected>Higher-order thinking</option>
         <option value="Mixed thinking">Mixed thinking</option>
       </select></div>
-      <div class="field"><label>Number of questions</label><input id="genCount" type="number" min="1" max="100" value="5"></div>
+      <div class="field"><label>Number of questions</label><input id="genCount" type="number" min="1" max="30" value="5"></div>
       <div class="field"><label>Question source</label><select id="genSourceType" onchange="updateAIGeneratorSourceUI()">
-        <option value="knowledge">AI medical knowledge</option>
+        <option value="knowledge">Gemini medical knowledge</option>
         <option value="website">Questions in this website</option>
       </select></div>
     </div>
@@ -1875,17 +1884,17 @@ function updateAIGeneratorSourceUI(){
   if(type==='website') {
     box.className='notice '+(pool.length?'ok':'error');
     box.textContent=pool.length
-      ? `The selected AI will use ${pool.length} existing website question${pool.length===1?'':'s'} from this exact lecture as source material and create new, non-copying questions.`
-      : 'No website questions exist for this exact module, subject and lecture. Choose Groq medical knowledge or select another lecture.';
+      ? `Gemini will use ${pool.length} existing website question${pool.length===1?'':'s'} from this exact lecture as source material and create new, non-copying questions.`
+      : 'No website questions exist for this exact module, subject and lecture. Choose Gemini medical knowledge or select another lecture.';
   } else {
     box.className='notice';
-    box.textContent='The selected AI will create original higher-order questions using its medical knowledge for the selected module, subject and lecture.';
+    box.textContent='Gemini will create original higher-order questions using its medical knowledge for the selected module, subject and lecture.';
   }
 }
 
 function aiChatTabHTML(){
   return `<div class="card">
-    <div class="category-head"><strong>Ask AI anything</strong>${aiChat.length?'<button class="btn" onclick="clearAIChat()">Clear chat</button>':''}</div>
+    <div class="category-head"><strong>Ask Gemini anything</strong>${aiChat.length?'<button class="btn" onclick="clearAIChat()">Clear chat</button>':''}</div>
     <div class="chat-log" id="chatLog" style="margin-top:12px">${aiChat.length?aiChat.map(m=>`<div class="chat-msg ${m.role==='ai'?'ai':m.role==='error'?'error':'user'}">${esc(m.text)}</div>`).join(''):'<div class="empty">Ask a medical or exam-prep question to get started.</div>'}</div>
     <div class="chat-input-row">
       <textarea id="chatInput" placeholder="Ask anything…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAIChat();}"></textarea>
@@ -1894,12 +1903,10 @@ function aiChatTabHTML(){
   </div>`;
 }
 function saveAISettings(){
-  aiSettings.provider=document.getElementById('aiProvider')?.value||'groq';
-  aiSettings.model=document.getElementById('aiModel')?.value.trim()||'';
-  aiSettings.accessCode=document.getElementById('aiAccessCode')?.value.trim()||'';
-  ensureAIModelForProvider();
+  aiSettings.model=document.getElementById('aiModel').value.trim();
+  aiSettings.accessCode=document.getElementById('aiAccessCode').value.trim();
   localStorage.setItem(CONFIG.aiSettingsKey,JSON.stringify(aiSettings));
-  toast(`AI provider saved: ${aiProviderLabel(aiSettings.provider)}.`,'ok');
+  toast('Settings saved.','ok');
 }
 
 function formatAIChatReply(reply){
@@ -1935,44 +1942,14 @@ function formatAIChatReply(reply){
 }
 
 function parseAIQuestionJSON(text){
-  let cleaned=String(text||'').trim();
-  cleaned=cleaned.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();
-
-  // First try the response exactly as returned.
-  try{
-    const parsed=JSON.parse(cleaned);
-    if(Array.isArray(parsed)) return parsed;
-    if(parsed && Array.isArray(parsed.questions)) return parsed.questions;
-  }catch(_){}
-
-  // Extract the largest complete JSON array from surrounding prose/code fences.
-  const start=cleaned.indexOf('[');
-  const end=cleaned.lastIndexOf(']');
-  if(start!==-1 && end>start){
-    const candidate=cleaned.slice(start,end+1).trim();
-    try{
-      const parsed=JSON.parse(candidate);
-      if(Array.isArray(parsed)) return parsed;
-    }catch(_){
-      const repaired=candidate.replace(/,\s*([}\]])/g,'$1');
-      try{
-        const parsed=JSON.parse(repaired);
-        if(Array.isArray(parsed)) return parsed;
-      }catch(_){}
-    }
-  }
-
-  // Some models return a single object for a one-question batch.
-  const objStart=cleaned.indexOf('{');
-  const objEnd=cleaned.lastIndexOf('}');
-  if(objStart!==-1 && objEnd>objStart){
-    try{
-      const parsed=JSON.parse(cleaned.slice(objStart,objEnd+1));
-      if(parsed && parsed.question && Array.isArray(parsed.options)) return [parsed];
-    }catch(_){}
-  }
-
-  throw new Error('The AI returned invalid JSON. MedEx now uses OpenRouter structured-output routing for MCQ generation. Please retry.');
+  let cleaned=text.trim().replace(/^```json/i,'').replace(/^```/,'').replace(/```\s*$/,'').trim();
+  const start=cleaned.indexOf('['), end=cleaned.lastIndexOf(']');
+  if(start!==-1 && end!==-1 && end>start) cleaned=cleaned.slice(start,end+1);
+  let parsed;
+  try{ parsed=JSON.parse(cleaned); }
+  catch(e){ throw new Error('Could not parse the AI response as JSON.'); }
+  if(!Array.isArray(parsed)) throw new Error('AI response was not a JSON array.');
+  return parsed;
 }
 function aiQuestionPreviewCard(q){
   const diffClass=(q.difficulty||'').toLowerCase();
@@ -1981,63 +1958,6 @@ function aiQuestionPreviewCard(q){
     <div class="mini" style="margin-top:4px">${esc(q.module)} · ${esc(q.subject)} · ${esc(q.lecture)}</div>
   </div>`;
 }
-function validateGeneratedRaw(raw, existingQuestions, batchQuestions){
-  const candidate=normalizeQuestion({id:`temp-${Math.random().toString(36).slice(2)}`,module:document.getElementById('genModule')?.value||'General',subject:document.getElementById('genSubject')?.value||'General',lecture:document.getElementById('genLecture')?.value||'General',difficulty:raw?.difficulty||document.getElementById('genDifficulty')?.value||'Mixed',question:raw?.question,options:raw?.options,correctIndex:raw?.correctIndex,explanation:raw?.explanation},'AI generated');
-  const structural=validateQuestion(candidate,0,{requireExplanation:true});
-  if(structural)return structural;
-  const dup=findQuestionDuplicate(candidate,[...existingQuestions,...batchQuestions],0.92);
-  if(dup)return `Duplicate or near-duplicate of ${dup.question.id||'an existing question'} (${dup.type==='exact'?'exact match':'very similar'})`;
-  return '';
-}
-function buildAIPrompt({module,subject,lecture,difficulty,thinkingLevel,batchCount,sourceType,sourceBlock,repairNote=''}){
-  return `You are the medical question generator for Med64, a medical examination platform.
-Generate exactly ${batchCount} original multiple-choice questions for medical students.
-Module: ${module}
-Subject: ${subject}
-Lecture: ${lecture}
-Difficulty: ${difficulty}
-Thinking level: ${thinkingLevel}
-Question source: ${sourceType==='website'?'questions already in this website':'selected AI medical knowledge'}
-
-${sourceBlock}
-
-Rules:
-- Exactly 4 non-empty answer options and exactly one correct answer.
-- Be medically accurate and focused on the selected lecture.
-- Prefer clinical application, analysis, interpretation and best-next-step reasoning.
-- Use plausible distractors based on common misconceptions or relevant alternatives.
-- Do not copy or paraphrase source questions.
-- Avoid duplicate questions.
-- Explanation must clearly justify the correct answer in 1–2 sentences.
-- Return ONLY valid JSON with exactly this shape: {"questions":[{"question":"...","options":["A","B","C","D"],"correctIndex":0,"explanation":"...","difficulty":"${difficulty}"}]}
-- correctIndex is zero-based.
-- Return exactly ${batchCount} complete question objects.
-- Never stop in the middle of JSON.
-${repairNote?`
-IMPORTANT RETRY NOTE: ${repairNote}`:''}`;
-}
-async function requestAIBatchWithRetry(prompt,batchCount,existingQuestions){
-  const maxAttempts=3;let lastError=null;
-  for(let attempt=1;attempt<=maxAttempts;attempt++){
-    try{
-      const text=await callAI([{role:'user',parts:[{text:prompt}]}],{maxOutputTokens:aiSettings.provider==='openrouter'?2200:Math.min(16000,Math.max(5000,batchCount*700)),jsonMode:aiSettings.provider==='openrouter'});
-      const rawList=parseAIQuestionJSON(text);
-      if(rawList.length!==batchCount)throw new Error(`Expected ${batchCount} question${batchCount===1?'':'s'}, received ${rawList.length}.`);
-      const batch=[];let problem='';
-      for(const raw of rawList){const err=validateGeneratedRaw(raw,existingQuestions,batch);if(err){problem=err;break;}batch.push(raw);}
-      if(problem)throw new Error(problem);
-      return batch;
-    }catch(e){
-      lastError=e;
-      if(attempt<maxAttempts){
-        await new Promise(r=>setTimeout(r,700*attempt));
-        prompt=prompt.replace(/\nIMPORTANT RETRY NOTE:[\s\S]*$/,'')+`\nIMPORTANT RETRY NOTE: Attempt ${attempt+1}. Previous output was rejected because: ${e.message}. Return only complete JSON and fix that problem.`;
-      }
-    }
-  }
-  const meta=lastAIResponseMeta?` [${lastAIResponseMeta.provider} · ${lastAIResponseMeta.model}${lastAIResponseMeta.finishReason?` · finish=${lastAIResponseMeta.finishReason}`:''}${lastAIResponseMeta.status?` · HTTP ${lastAIResponseMeta.status}`:''}]`:'';
-  throw new Error(`${lastError?.message||'AI generation failed.'}${meta}`);
-}
 async function generateAIQuestions(){
   if(aiBusy) return;
   const module=document.getElementById('genModule').value.trim();
@@ -2045,21 +1965,24 @@ async function generateAIQuestions(){
   const lecture=document.getElementById('genLecture').value.trim();
   const difficulty=document.getElementById('genDifficulty').value;
   const thinkingLevel=document.getElementById('genThinking')?.value||'Higher-order thinking';
-  const count=Math.max(1,Math.min(100,Number(document.getElementById('genCount').value)||5));
+  const count=Math.max(1,Math.min(30,Number(document.getElementById('genCount').value)||5));
   const sourceType=document.getElementById('genSourceType').value;
   const sourcePool=getAIGeneratorPool();
 
   if(!module||!subject||!lecture){toast('Select a module, subject and lecture from the website lists.','error');return;}
-  if(sourceType==='website'&&!sourcePool.length){toast('No website questions exist for this exact lecture. Choose another lecture or use AI medical knowledge.','error');return;}
+  if(sourceType==='website'&&!sourcePool.length){toast('No website questions exist for this exact lecture. Choose another lecture or use Gemini medical knowledge.','error');return;}
 
   const btn=document.getElementById('genBtn');
   const resultBox=document.getElementById('genResult');
   aiBusy=true;
   if(btn){btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Generating…';}
+  if(resultBox) resultBox.innerHTML='<div class="card" style="margin-top:14px"><div class="mini">Contacting Gemini 3.6 Flash…</div></div>';
 
   let sourceBlock='';
-  let reference=`${aiProviderLabel(aiSettings.provider)} · ${aiSettings.model} medical knowledge`;
+  let reference='Gemini 3.6 Flash medical knowledge';
   if(sourceType==='website'){
+    // Keep the source compact enough for high-volume generation while preserving
+    // the actual wording, options, correct answer and explanation from the site.
     const sourceQuestions=sourcePool.slice(0,80).map((q,i)=>({
       number:i+1, question:q.question, options:q.options, correctAnswer:q.options[q.correctIndex], explanation:q.explanation
     }));
@@ -2072,26 +1995,37 @@ ${JSON.stringify(sourceQuestions)}`;
     sourceBlock='Use your medical knowledge to create accurate original questions for the selected topic. Do not invent facts or cite nonexistent sources.';
   }
 
-  // Generate in small batches. OpenRouter free/low-credit keys can reject a request
-  // before generation if max output tokens exceed the remaining credit allowance.
-  // Keep OpenRouter batches smaller and the requested output budget conservative.
-  const batchSize=aiSettings.provider==='openrouter' ? 1 : Math.min(10,count);
-  const batches=[];
-  for(let n=0;n<count;n+=batchSize) batches.push(Math.min(batchSize,count-n));
-  const allRaw=[];
+  const prompt=`You are the medical question generator for Med64, a medical examination platform.
+Generate exactly ${count} original multiple-choice questions for medical students.
+Module: ${module}
+Subject: ${subject}
+Lecture: ${lecture}
+Difficulty: ${difficulty}
+Thinking level: ${thinkingLevel}
+Question source: ${sourceType==='website'?'questions already in this website':'Gemini medical knowledge'}
+
+${sourceBlock}
+
+Rules:
+- Each question must have exactly 4 answer options and exactly one correct answer.
+- The questions must be clinically and medically accurate.
+- Prioritize higher-order thinking (Bloom-style Apply, Analyze, and Evaluate): use clinical vignettes, interpretation of signs/labs/images or mechanisms, comparison of related concepts, prediction of outcomes, and best-next-step reasoning when appropriate.
+- Do NOT make questions that can be answered by simple definition/recall unless a small amount of recall is necessary to support a higher-order decision.
+- Make distractors plausible and based on common misconceptions or clinically relevant alternatives.
+- Avoid duplicate questions and avoid copying source wording.
+- Keep the questions focused on the selected lecture.
+- Return ONLY a JSON array, with no markdown fences or commentary.
+- Each item must have this exact shape:
+{"question":"...","options":["...","...","...","..."],"correctIndex":0,"explanation":"...","difficulty":"${difficulty}"}
+- correctIndex is zero-based.
+- explanation should briefly justify the correct answer.`;
 
   try{
-    for(let bi=0;bi<batches.length;bi++){
-      const batchCount=batches[bi];
-      if(resultBox) resultBox.innerHTML=`<div class="card" style="margin-top:14px"><div class="mini">Generating batch ${bi+1} of ${batches.length} (${allRaw.length}/${count} questions completed) with ${esc(aiProviderLabel(aiSettings.provider))}…</div></div>`;
+    const text=await callGemini([{role:'user',parts:[{text:prompt}]}],{maxOutputTokens:Math.min(12000,Math.max(2500,count*500))});
+    const rawList=parseAIQuestionJSON(text);
+    if(!rawList.length) throw new Error('No questions were returned. Try again or adjust your selections.');
 
-      const prompt=buildAIPrompt({module,subject,lecture,difficulty,thinkingLevel,batchCount,sourceType,sourceBlock});
-      const rawList=await requestAIBatchWithRetry(prompt,batchCount,allQuestionBank);
-      allRaw.push(...rawList.slice(0,batchCount));
-      if(rawList.length<batchCount) throw new Error(`${aiProviderLabel(aiSettings.provider)} returned only ${rawList.length} of ${batchCount} questions in batch ${bi+1}. Please try again.`);
-    }
-
-    const stamped=allRaw.slice(0,count).map((raw,i)=>normalizeQuestion({
+    const stamped=rawList.slice(0,count).map((raw,i)=>normalizeQuestion({
       id:`ai-${Date.now()}-${i}-${Math.random().toString(36).slice(2,6)}`,
       module: `${module} AI generated`, subject, lecture,
       difficulty: raw.difficulty || difficulty,
@@ -2103,21 +2037,20 @@ ${JSON.stringify(sourceQuestions)}`;
     },'AI generated'));
 
     const errors=stamped.map((q,i)=>validateQuestion(q,i)).filter(Boolean);
-    if(errors.length) throw new Error(`${aiProviderLabel(aiSettings.provider)} returned a malformed question: ${errors[0]}`);
-    if(stamped.length<count) throw new Error(`${aiProviderLabel(aiSettings.provider)} returned ${stamped.length} questions instead of ${count}. Please try again.`);
+    if(errors.length) throw new Error('Gemini returned a malformed question: '+errors[0]);
+    if(stamped.length<count) throw new Error(`Gemini returned ${stamped.length} questions instead of ${count}. Please try again.`);
 
     aiQuestions.push(...stamped);
     localStorage.setItem(CONFIG.aiQuestionsKey,JSON.stringify(aiQuestions));
 
-    if(resultBox) resultBox.innerHTML=`<div class="card" style="margin-top:14px"><div class="notice ok">Generated ${stamped.length} question${stamped.length===1?'':'s'} from ${sourceType==='website'?'your website question bank':'AI medical knowledge'}.</div>
-    <div class="mini" style="margin-top:8px">${esc(module+' AI generated')} · ${esc(subject)} · ${esc(lecture)} · ${esc(aiProviderLabel(aiSettings.provider))}</div>
+    if(resultBox) resultBox.innerHTML=`<div class="card" style="margin-top:14px"><div class="notice ok">Generated ${stamped.length} question${stamped.length===1?'':'s'} from ${sourceType==='website'?'your website question bank':'Gemini medical knowledge'}.</div>
+    <div class="mini" style="margin-top:8px">${esc(module+' AI generated')} · ${esc(subject)} · ${esc(lecture)}</div>
     <div style="margin-top:12px">${stamped.map(q=>aiQuestionPreviewCard(q)).join('')}</div>
     <div class="actions" style="margin-top:12px"><button class="btn primary" onclick="go('aiquestions')">Review in AI Questions</button></div></div>`;
-    toast(`Generated ${stamped.length} questions with ${aiProviderLabel(aiSettings.provider)}.`,'ok');
+    toast(`Generated ${stamped.length} questions with Gemini 3.6 Flash.`,'ok');
   }catch(e){
-    const diagnostic=lastAIResponseMeta?`<div class="mini" style="margin-top:8px">Provider: ${esc(lastAIResponseMeta.provider||aiProviderLabel(aiSettings.provider))} · Model: ${esc(lastAIResponseMeta.model||aiSettings.model)}${lastAIResponseMeta.finishReason?` · Finish: ${esc(lastAIResponseMeta.finishReason)}`:''}${lastAIResponseMeta.status?` · HTTP ${esc(lastAIResponseMeta.status)}`:''}</div>`:'';
-    if(resultBox) resultBox.innerHTML=`<div class="card" style="margin-top:14px"><div class="notice error"><b>Generation failed</b><div style="margin-top:6px">${esc(e.message)}</div>${diagnostic}<div class="actions" style="margin-top:12px"><button class="btn primary" onclick="generateAIQuestions()">Retry generation</button><button class="btn" onclick="go('ai')">Change AI provider</button></div></div></div>`;
-    toast(`${aiProviderLabel(aiSettings.provider)} generation failed: `+e.message,'error');
+    if(resultBox) resultBox.innerHTML=`<div class="card" style="margin-top:14px"><div class="notice error">Generation failed: ${esc(e.message)}</div></div>`;
+    toast('Gemini generation failed: '+e.message,'error');
   }finally{
     aiBusy=false;
     if(btn){btn.disabled=false; btn.textContent='Generate questions';}
@@ -2147,7 +2080,7 @@ async function sendAIChat(){
         ? `Answer the user's message in ordinary, readable text. Do NOT return JSON, JSON arrays, code blocks, or a machine-readable object. Use normal sentences, short paragraphs, and bullet points when useful. If the user asks for an explanation, explain it clearly rather than formatting it as JSON.\n\nUser message:\n${m.text}`
         : m.text}]
     }));
-    const reply=await callAI(contents,{maxOutputTokens:4096,responseMimeType:'text/plain'});
+    const reply=await callGemini(contents,{maxOutputTokens:4096,responseMimeType:'text/plain'});
     aiChat.push({role:'ai',text:formatAIChatReply(reply)});
   }catch(e){
     aiChat.push({role:'error',text:'Error: '+e.message});
@@ -2180,7 +2113,7 @@ function renderAIQuestions(){
     <button class="btn danger" onclick="clearAllAIQuestions()">Delete all</button>
   </div>`:''}</div>
   <div style="margin-top:16px">${aiQuestions.length?aiQuestions.slice().reverse().map(q=>renderAIQuestionRow(q)).join(''):'<div class="card empty">No AI questions yet. Generate some from the AI Assistant page.</div>'}</div>`;
-  document.getElementById('app').innerHTML=layout('AI Questions','Every question Groq has generated for you, independent of the main bank.',body,`<button class="btn primary" onclick="go('ai')">+ Generate more</button>`);
+  document.getElementById('app').innerHTML=layout('AI Questions','Every question Gemini has generated for you, independent of the main bank.',body,`<button class="btn primary" onclick="go('ai')">+ Generate more</button>`);
 }
 function renderAIQuestionRow(q){
   const diffClass=(q.difficulty||'').toLowerCase();
