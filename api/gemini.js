@@ -1,56 +1,86 @@
-const DEFAULT_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
-function json(res, status, body){
-  res.status(status).setHeader('Content-Type','application/json; charset=utf-8');
-  return res.end(JSON.stringify(body));
+function cleanModelName(name) {
+  return String(name || '').replace(/^models\//, '').trim();
 }
 
-function buildQuestionPrompt(p){
-  const count=Math.min(Math.max(Number(p.count)||5,1),30);
-  const source=p.sourceType==='website'
-    ? `Use these website questions as source material. Do not copy them verbatim:\n${JSON.stringify((p.sourceQuestions||[]).slice(0,80))}`
-    : 'Use accurate medical knowledge.';
-  return `Generate exactly ${count} original medical MCQs for a medical examination website.
-Module: ${p.module||'General'}
-Subject: ${p.subject||'General'}
-Lecture: ${p.lecture||'General'}
-Difficulty: ${p.difficulty||'Mixed'}
-Thinking level: ${p.thinkingLevel||'Higher-order thinking'}
-Source: ${source}
-Requirements:
-- Exactly 4 options per question.
-- Exactly one correct answer.
-- Prefer clinical reasoning, application, interpretation, comparison, or multi-step reasoning over simple recall.
-- Give a concise but real medical explanation.
-- Return ONLY a JSON array. Each object must contain question, options, correctIndex, explanation, difficulty.
-- correctIndex must be 0, 1, 2, or 3.`;
+async function jsonFetch(url, options = {}) {
+  const res = await fetch(url, options);
+  let data = null;
+  try { data = await res.json(); } catch (_) {}
+  return { res, data };
 }
 
-module.exports = async function handler(req,res){
-  if(req.method!=='POST') return json(res,405,{error:'Method not allowed.'});
-  const apiKey=process.env.GEMINI_API_KEY;
-  if(!apiKey) return json(res,500,{error:'GEMINI_API_KEY is not configured in Vercel Environment Variables.'});
-  try{
-    const body=req.body||{};
-    let contents=body.contents;
-    let generationConfig=body.generationConfig||{};
-    let model=String(body.model||DEFAULT_MODEL).replace(/^models\//,'').trim()||DEFAULT_MODEL;
-    if(!Array.isArray(contents)){
-      contents=[{role:'user',parts:[{text:buildQuestionPrompt(body)}]}];
-      generationConfig={...generationConfig,responseMimeType:'application/json'};
-    }
-    const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
-    const upstream=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':apiKey},body:JSON.stringify({contents,generationConfig})});
-    const raw=await upstream.text();
-    let data; try{data=JSON.parse(raw);}catch{data=null;}
-    if(!upstream.ok){
-      const msg=data?.error?.message||`Gemini API returned HTTP ${upstream.status}.`;
-      return json(res,upstream.status,{error:msg,details:data?.error?.status||null});
-    }
-    const text=data?.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('')||'';
-    if(!text) return json(res,502,{error:'Gemini returned an empty response.',raw:data});
-    return json(res,200,{text,model});
-  }catch(err){
-    return json(res,500,{error:err?.message||'Unexpected Gemini server error.'});
+async function listFallbackModel(apiKey) {
+  const { res, data } = await jsonFetch(`${API_BASE}/models?key=${encodeURIComponent(apiKey)}`);
+  if (!res.ok || !Array.isArray(data?.models)) return null;
+  const models = data.models.filter(m =>
+    Array.isArray(m.supportedGenerationMethods) &&
+    m.supportedGenerationMethods.includes('generateContent')
+  );
+  const preferred = [
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash'
+  ];
+  for (const wanted of preferred) {
+    const hit = models.find(m => cleanModelName(m.name) === wanted);
+    if (hit) return cleanModelName(hit.name);
   }
-};
+  const flash = models.find(m => /flash/i.test(m.name || ''));
+  return flash ? cleanModelName(flash.name) : (models[0] ? cleanModelName(models[0].name) : null);
+}
+
+async function generate(apiKey, model, body) {
+  const modelName = cleanModelName(model);
+  const url = `${API_BASE}/models/${encodeURIComponent(modelName)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  return jsonFetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed. Use POST.' });
+    return;
+  }
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    res.status(500).json({ error: 'GEMINI_API_KEY is missing in Vercel Environment Variables.' });
+    return;
+  }
+
+  const { contents, generationConfig, model } = req.body || {};
+  if (!Array.isArray(contents) || !contents.length) {
+    res.status(400).json({ error: 'Missing AI contents.' });
+    return;
+  }
+
+  const requested = cleanModelName(model || process.env.GEMINI_MODEL || 'gemini-2.5-flash');
+  const body = { contents, generationConfig: generationConfig || {} };
+  let result = await generate(apiKey, requested, body);
+
+  if (!result.res.ok && (result.res.status === 400 || result.res.status === 404)) {
+    const fallback = await listFallbackModel(apiKey);
+    if (fallback && fallback !== requested) {
+      result = await generate(apiKey, fallback, body);
+    }
+  }
+
+  if (!result.res.ok) {
+    const message = result.data?.error?.message || result.data?.error || `Gemini API HTTP ${result.res.status}`;
+    res.status(result.res.status).json({ error: message, model: requested });
+    return;
+  }
+
+  const parts = result.data?.candidates?.[0]?.content?.parts || [];
+  const text = parts.map(p => p?.text || '').join('').trim();
+  if (!text) {
+    res.status(502).json({ error: 'Gemini returned no text.' });
+    return;
+  }
+  res.status(200).json({ text, model: result.data?.modelVersion || requested });
+}
