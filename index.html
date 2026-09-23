@@ -304,6 +304,7 @@ const DEFAULT_SETTINGS = {
 };
 
 const DEFAULT_AI_SETTINGS = {
+  provider: 'gemini',
   model: '',
   accessCode: ''
 };
@@ -1864,6 +1865,47 @@ function exportHistory(){downloadBlob(JSON.stringify({exportedAt:new Date().toIS
 
 let aiTab='generate';
 
+async function callAIProvider(provider, contents, generationConfig, modelOverride){
+  const selected = provider === 'groq' ? 'groq' : 'gemini';
+  const headers={'Content-Type':'application/json'};
+  if(aiSettings.accessCode) headers['x-access-code']=aiSettings.accessCode;
+
+  try{
+    if(selected==='groq'){
+      const messages=contents.map(c=>({
+        role:c.role==='model'?'assistant':(c.role||'user'),
+        content:(c.parts||[]).map(p=>p?.text||'').join('')
+      }));
+      const res=await fetch('/api/groq',{
+        method:'POST',
+        headers,
+        body:JSON.stringify({
+          messages,
+          model:modelOverride || aiSettings.model || undefined,
+          responseFormat:{type:'json_object'}
+        })
+      });
+      let data=null; try{data=await res.json();}catch(e){}
+      if(!res.ok)throw new Error((data&&data.error)||`HTTP ${res.status} from Groq.`);
+      if(!data||!data.text)throw new Error('Groq returned an empty response.');
+      return {text:data.text,provider:'groq',model:data.model||modelOverride||'openai/gpt-oss-120b'};
+    }
+
+    const res=await fetch('/api/gemini',{
+      method:'POST',
+      headers,
+      body:JSON.stringify({contents,generationConfig,model:modelOverride||undefined})
+    });
+    let data=null; try{data=await res.json();}catch(e){}
+    if(!res.ok)throw new Error((data&&data.error)||`HTTP ${res.status} from Gemini.`);
+    if(!data||!data.text)throw new Error('Gemini returned an empty response.');
+    return {text:data.text,provider:'gemini',model:data.model||modelOverride||'gemini-3.6-flash'};
+  }catch(e){
+    if(e instanceof Error) throw e;
+    throw new Error('Could not reach the AI service. Check your connection.');
+  }
+}
+
 async function callMultiAgent(payload){
   const sourceText=payload.sourceType==='website'
     ? `Use these website questions only as source material and create new questions without copying them:\n${JSON.stringify(payload.sourceQuestions||[]).slice(0,50000)}`
@@ -1875,34 +1917,43 @@ Lecture: ${payload.lecture||''}
 Difficulty: ${payload.difficulty||'Mixed'}
 Thinking level: ${payload.thinkingLevel||'Higher-order thinking'}
 ${sourceText}
-Rules: exactly 4 options; exactly one correct answer; clinically accurate; prefer Apply/Analyze/Evaluate clinical reasoning; plausible distractors; no copied source wording; stay focused on the selected lecture; return ONLY a JSON array.
+Rules: exactly 4 options; exactly one correct answer; clinically accurate; prefer Apply/Analyze/Evaluate clinical reasoning; plausible distractors; no copied source wording; stay focused on the selected lecture.
+Return a JSON object with one key "questions" whose value is an array containing exactly the requested number of questions.
 Each item: {"question":"...","options":["...","...","...","..."],"correctIndex":0,"explanation":"...","difficulty":"..."}`;
-  const text=await callGemini([{role:'user',parts:[{text:prompt}]}],{maxOutputTokens:8192,responseMimeType:'application/json'});
-  return {text,agents:'Gemini'};
+
+  const result=await callAIProvider(
+    payload.provider || aiSettings.provider || 'gemini',
+    [{role:'user',parts:[{text:prompt}]}],
+    {maxOutputTokens:Math.min(65536,Math.max(8192,(payload.count||5)*900)),responseMimeType:'application/json'},
+    payload.model
+  );
+  return {...result,agents:result.provider==='groq'?'Groq':'Gemini 3.6 Flash'};
 }
 
 async function callGemini(contents,generationConfig){
-  // Kept for the chat feature; question generation uses the multi-agent endpoint.
-  let res,data;
-  const headers={'Content-Type':'application/json'};
-  if(aiSettings.accessCode) headers['x-access-code']=aiSettings.accessCode;
-  try{res=await fetch('/api/gemini',{method:'POST',headers,body:JSON.stringify({contents,generationConfig,model:aiSettings.model||undefined})});}
-  catch(e){throw new Error('Could not reach the AI service. Check your connection.');}
-  try{data=await res.json();}catch(e){data=null;}
-  if(!res.ok)throw new Error((data&&data.error)||`HTTP ${res.status} from the AI service.`);
-  if(!data||!data.text)throw new Error('The model returned an empty response.');
-  return data.text;
+  const result=await callAIProvider('gemini',contents,generationConfig,aiSettings.model||undefined);
+  return result.text;
+}
+
+async function callAIChat(contents){
+  const provider=aiSettings.provider||'gemini';
+  const result=await callAIProvider(provider,contents,{maxOutputTokens:4096},aiSettings.model||undefined);
+  return result.text;
 }
 
 function renderAIAssistant(){
   const body=`
   <div class="card">
-    <div class="category-head"><strong>Gemini AI</strong><span class="ai-badge">✦ Gemini 3.6</span></div>
-    <p class="mini" style="margin:8px 0 0">Question generation uses multiple independent medical AI agents plus a final critic/validator. API keys stay server-side and are never sent to the browser.</p>
+    <div class="category-head"><strong>AI Assistant</strong><span class="ai-badge">✦ Gemini 3.6 + Groq</span></div>
+    <p class="mini" style="margin:8px 0 0">Choose Gemini 3.6 Flash or Groq for AI generation and chat. API keys stay server-side and are never sent to the browser.</p>
     <details style="margin-top:10px">
       <summary class="mini" style="cursor:pointer;color:var(--primary2);font-weight:700">Advanced settings</summary>
-      <div class="grid two" style="margin-top:10px">
-        <div class="field"><label>Model override (optional)</label><input id="aiModel" placeholder="Uses the server default" value="${esc(aiSettings.model)}"></div>
+      <div class="grid three" style="margin-top:10px">
+        <div class="field"><label>AI provider</label><select id="aiProvider">
+          <option value="gemini" ${aiSettings.provider==='gemini'?'selected':''}>Gemini 3.6 Flash</option>
+          <option value="groq" ${aiSettings.provider==='groq'?'selected':''}>Groq · GPT-OSS 120B</option>
+        </select></div>
+        <div class="field"><label>Model override (optional)</label><input id="aiModel" placeholder="Uses provider default" value="${esc(aiSettings.model)}"></div>
         <div class="field"><label>Access code (only if this site requires one)</label><input id="aiAccessCode" type="password" placeholder="Leave blank if none" value="${esc(aiSettings.accessCode)}"></div>
       </div>
       <div class="actions" style="margin-top:10px"><button class="btn" onclick="saveAISettings()">Save</button></div>
@@ -1923,8 +1974,8 @@ function setAITab(tab){ aiTab=tab; renderAIAssistant(); }
 function aiGenerateTabHTML(){
   const modules=getModules();
   return `<div class="card">
-    <h3 style="margin-top:0">Generate questions with Multi-Agent AI</h3>
-    <p class="mini" style="margin:6px 0 14px">Choose from the modules, subjects and lectures that already exist in your website question bank. Then choose whether Gemini should use its medical knowledge or your website questions as the source.</p>
+    <h3 style="margin-top:0">Generate questions with AI</h3>
+    <p class="mini" style="margin:6px 0 14px">Choose from the modules, subjects and lectures that already exist in your website question bank. Choose an AI provider, then choose whether it should use medical knowledge or your website questions as the source.</p>
     <div class="grid three">
       <div class="field"><label>Module</label><select id="genModule" onchange="updateAIGeneratorSubjects()"><option value="">Select module</option>${modules.map(m=>`<option value="${attrJs(m)}">${esc(m)}</option>`).join('')}</select></div>
       <div class="field"><label>Subject</label><select id="genSubject" onchange="updateAIGeneratorLectures()" disabled><option value="">Select subject</option></select></div>
@@ -1943,7 +1994,7 @@ function aiGenerateTabHTML(){
       </select></div>
       <div class="field"><label>Number of questions (batch)</label><input id="genCount" type="number" min="1" max="50" value="5"></div>
       <div class="field"><label>Question source</label><select id="genSourceType" onchange="updateAIGeneratorSourceUI()">
-        <option value="knowledge">Gemini medical knowledge</option>
+        <option value="knowledge">AI medical knowledge</option>
         <option value="website">Questions in this website</option>
       </select></div>
     </div>
@@ -1995,11 +2046,11 @@ function updateAIGeneratorSourceUI(){
   if(type==='website') {
     box.className='notice '+(pool.length?'ok':'error');
     box.textContent=pool.length
-      ? `Gemini will use ${pool.length} existing website question${pool.length===1?'':'s'} from this exact lecture as source material and create new, non-copying questions.`
+      ? `The selected AI provider will use ${pool.length} existing website question${pool.length===1?'':'s'} from this exact lecture as source material and create new, non-copying questions.`
       : 'No website questions exist for this exact module, subject and lecture. Choose Gemini medical knowledge or select another lecture.';
   } else {
     box.className='notice';
-    box.textContent='Gemini will create original higher-order questions using its medical knowledge for the selected module, subject and lecture.';
+    box.textContent='The selected AI provider will create original higher-order questions using its medical knowledge for the selected module, subject and lecture.';
   }
 }
 
@@ -2014,10 +2065,11 @@ function aiChatTabHTML(){
   </div>`;
 }
 function saveAISettings(){
+  aiSettings.provider=document.getElementById('aiProvider').value;
   aiSettings.model=document.getElementById('aiModel').value.trim();
   aiSettings.accessCode=document.getElementById('aiAccessCode').value.trim();
   localStorage.setItem(CONFIG.aiSettingsKey,JSON.stringify(aiSettings));
-  toast('Settings saved.','ok');
+  toast('AI settings saved.','ok');
 }
 
 function formatAIChatReply(reply){
@@ -2059,7 +2111,11 @@ function parseAIQuestionJSON(text){
   let parsed;
   try{ parsed=JSON.parse(cleaned); }
   catch(e){ throw new Error('Could not parse the AI response as JSON.'); }
-  if(!Array.isArray(parsed)) throw new Error('AI response was not a JSON array.');
+  if(!Array.isArray(parsed)){
+    if(Array.isArray(parsed.questions)) parsed=parsed.questions;
+    else if(Array.isArray(parsed.data)) parsed=parsed.data;
+    else throw new Error('AI response did not contain a questions array.');
+  }
   return parsed;
 }
 function aiQuestionPreviewCard(q){
@@ -2103,6 +2159,7 @@ async function generateAIQuestions(){
   const count=Math.max(1,Math.min(50,Number(document.getElementById('genCount').value)||5));
   const sourceType=document.getElementById('genSourceType').value;
   const sourcePool=getAIGeneratorPool();
+  const provider=aiSettings.provider||'gemini';
 
   if(!module||!subject||!lecture){toast('Select a module, subject and lecture from the website lists.','error');return;}
   if(sourceType==='website'&&!sourcePool.length){toast('No website questions exist for this exact lecture. Choose another lecture or use Gemini medical knowledge.','error');return;}
@@ -2111,7 +2168,7 @@ async function generateAIQuestions(){
   const resultBox=document.getElementById('genResult');
   aiBusy=true;
   if(btn){btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Generating…';}
-  if(resultBox) resultBox.innerHTML='<div class="card" style="margin-top:14px"><div class="mini">Running independent medical agents and a final validator…</div></div>';
+  if(resultBox) resultBox.innerHTML='<div class="card" style="margin-top:14px"><div class="mini">Generating and validating questions with the selected AI provider…</div></div>';
 
   let sourceBlock='';
   let reference='Gemini 3.6 Flash medical knowledge';
@@ -2156,7 +2213,7 @@ Rules:
 - explanation should briefly justify the correct answer.`;
 
   try{
-    const agentResult=await callMultiAgent({module,subject,lecture,difficulty,thinkingLevel,count,sourceType,sourceQuestions:sourcePool.slice(0,80).map(q=>({question:q.question,options:q.options,correctAnswer:q.options[q.correctIndex],explanation:q.explanation}))});
+    const agentResult=await callMultiAgent({provider,model:aiSettings.model||undefined,module,subject,lecture,difficulty,thinkingLevel,count,sourceType,sourceQuestions:sourcePool.slice(0,80).map(q=>({question:q.question,options:q.options,correctAnswer:q.options[q.correctIndex],explanation:q.explanation}))});
     const rawList=parseAIQuestionJSON(agentResult.text);
     if(!rawList.length) throw new Error('No questions were returned. Try again or adjust your selections.');
 
@@ -2185,10 +2242,10 @@ Rules:
     <div class="mini" style="margin-top:8px">${esc(module+' AI generated')} · ${esc(subject)} · ${esc(lecture)}</div>
     <div style="margin-top:12px">${unique.map(q=>aiQuestionPreviewCard(q)).join('')}</div>
     <div class="actions" style="margin-top:12px"><button class="btn primary" onclick="go('aiquestions')">Review in AI Questions</button></div></div>`;
-    toast(`Generated ${unique.length} questions using ${agentResult.agents||'multiple AI agents'}.`,'ok');
+    toast(`Generated ${unique.length} questions using ${agentResult.agents||'AI'}.`,'ok');
   }catch(e){
     if(resultBox) resultBox.innerHTML=`<div class="card" style="margin-top:14px"><div class="notice error">Generation failed: ${esc(e.message)}</div></div>`;
-    toast('Gemini generation failed: '+e.message,'error');
+    toast('AI generation failed: '+e.message,'error');
   }finally{
     aiBusy=false;
     if(btn){btn.disabled=false; btn.textContent='Generate questions';}
